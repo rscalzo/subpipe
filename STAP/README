@@ -1,0 +1,19 @@
+
+
+STAP_main.py: Call STAP_thread function
+	      This can be modified to do multi-threading
+
+STAP_thread(): Python function to run the subtraction thread
+
+Python wrappers:
+
+STAP_imcorr.py 
+STAP_WCS.py
+STAP_SEx.py
+STAP_remap.py
+STAP_hotpants.py
+STAP_flag.py     :preliminary, flag source list
+STAP_thumb.py    :preliminary, make thumbnails
+
+
+All wrappers call STAP_callexternal() defined in STAP_comm.py

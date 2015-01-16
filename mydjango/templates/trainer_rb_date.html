@@ -1,0 +1,78 @@
+{% extends "base.html" %} 
+{% load get_attr %}
+
+{% block title %}
+Real-Bogus Trainer Page
+{% endblock %}
+
+{% block header %}
+Real-Bogus Trainer Page - for {{date}}
+{% endblock %}
+
+{% block navigation %}
+Click <a href="/trainer/"> here  </a> to go back to the trainer home page.
+<p>
+Logged in as user: {{user.username}}
+<p>
+<a href="/accounts/logout/"> log out </a>
+{% endblock %}
+
+{% block overview %}
+Please assign a Real-Bogus probability value to each candidate, on a scale of 0 to 100. 0 means definitely Bogus and 100 means definitely Real.  
+{% endblock %}
+
+{% block content %}
+<table border=1 width=90%>
+{% for cand in trainer_candidates.object_list %}
+<tr>
+<td width=25%><a name="{{cand.name}}"><img src="{{MEDIA_URL}}{{cand.thumb_new}}" width=100%></a></td>
+<td width=25%><img src="{{MEDIA_URL}}{{cand.thumb_ref}}" width=100%></td>
+<td width=25%><img src="{{MEDIA_URL}}{{cand.thumb_diff}}" width=100%></td>
+<td width=25%><table border=1 width=100%>
+        <tr><td colspan=4><center>candidate : {{cand.name}}</center></td></tr>
+        <tr><td>flux</td><td>flux_err</td><td>sigma</td><td>fwhm</td></tr>
+        <tr><td>{{cand.f4sub|floatformat:2}}</td><td>{{cand.df4sub|floatformat:2}}</td><td>{{cand.apsig4|floatformat:2}}</td><td>{{cand.fwhmsub|floatformat:2}}</td>
+        <tr><td>asub</td><td>esub</td><td>starsub</td><td>Rfwhm</td></tr>
+        <tr><td>{{cand.asub|floatformat:2}}</td><td>{{cand.esub|floatformat:2}}</td><td>{{cand.starsub|floatformat:2}}</td><td>{{cand.Rfwhm|floatformat:2}}</td>
+	<tr><td>nndnew</td><td>flag</td><td>n2sig5</td><td>n2sig3</td></tr>
+        <tr><td>{{cand.nndnew|floatformat:2}}</td><td>{{cand.flagsub}}</td><td>{{cand.n2sig5}}</td><td>{{cand.n2sig3}}</td>
+	<tr><td>aref</td><td>eref</td><td>flagref</td><td>starref</td></tr>
+        <tr><td>{{cand.aref|floatformat:2}}</td><td>{{cand.eref|floatformat:2}}</td><td>{{cand.flagref}}</td><td>{{cand.starref|floatformat:2}}</td>
+		
+	{% with "score"|add:userid as scoreid %}
+	{% with cand.name|add:"_"|add:scoreid as scorename %}
+	{% with cand|get_attr:scoreid as currentscore %}
+        <tr><td colspan=4>
+	    <center>
+            <form  action="#{{cand.name}}" method="post">{% csrf_token %}
+	      {% ifequal currentscore -1  %}
+	      <input name="{{scorename}}" type="range" min="0" max="100" value="0" step="1"/>
+	      <input type="submit" value="Enter">
+	      {% else %}
+	      <input name="{{scorename}}" type="range" min="0" max="100" value="{{currentscore}}" step="1"/>
+	      <input type="submit" value="Re-Enter">
+	      {% endifequal %}</form>
+	</center></td></tr>
+        <tr><td colspan=4>
+	    <center>current score: {% if currentscore > 0 %}<font color=#F00>{% endif %}{{currentscore}}{% if currentscore > 0 %}</font>{% endif %}</center></td></tr></table>
+	{% endwith %}
+	{% endwith %}
+	{% endwith %}
+{% endfor %}
+</table>
+<div class="pagination">
+    <span class="step-links">
+        {% if trainer_candidates.has_previous %}
+            <a href="?page={{ trainer_candidates.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ trainer_candidates.number }} of {{ trainer_candidates.paginator.num_pages }}.
+        </span>
+
+        {% if trainer_candidates.has_next %}
+            <a href="?page={{ trainer_candidates.next_page_number }}">next</a>
+        {% endif %}
+    </span>
+</div>
+{% endblock %}

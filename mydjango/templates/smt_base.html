@@ -1,0 +1,46 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=UTF-8" />
+    <title>{% block title %}SkyMapper Transient search{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/smt.css" />
+    {% block htmlhead %}
+    {% endblock %}
+  </head>
+
+<body>
+  <div id="container">
+    <div id="header">
+      {% block header %}
+      <h1>SkyMapper Transient search</h1>
+      {% endblock %}
+    </div>
+    <div id="naviheader" class="clearfix">
+      {% block naviheader %}
+      {% if request.path != "/" %}
+      <div class='navileft'>
+        <a href="{% url home %}"> Home </a>
+        &nbsp;&nbsp;&nbsp;&nbsp;</div>
+      {% block naviheader2 %}
+      {% endblock %}      
+      {% endif %}
+      {% if user.is_authenticated %}
+      <div class='naviright'>Logged in as user:
+        {{user.username}} &nbsp;&nbsp;&nbsp;&nbsp; <a href="{% url home %}accounts/logout/"> Log out </a></div>
+      {% else %}
+      {% if not "accounts" in request.path %}
+      <div class='naviright'><a href="{% url home %}accounts/password/reset/"> Forgot Password? </a></div>
+      <div class='naviright'><a href="{% url home %}accounts/login/?next={{request.path}}"> Log in </a></div>
+      {% endif %}
+      {% endif %}
+      {% endblock %}
+    </div>      
+    <div id="content" class="clearfix">
+      {% block content %}
+      {% endblock %}
+    </div>
+  </div>
+</body>
+</html>
+

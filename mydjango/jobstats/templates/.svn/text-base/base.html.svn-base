@@ -1,0 +1,28 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=UTF-8" />
+    <title>{% block title %}SkyMapper SN Search Job Stats{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/jobstats.css" />
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+            {% block header %}
+            <h1>SkyMapper SN Search</h1>
+            {% endblock %}
+        </div>
+        <div id="subheader">
+            {% block subheader %}
+            {% endblock %}
+        </div>
+        <div id="content">
+            {% block content %}
+            {% endblock %}
+        </div>
+    </div>
+</body>
+</html>
+

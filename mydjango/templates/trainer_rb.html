@@ -1,0 +1,34 @@
+{% extends "base.html" %} 
+{% load get_attr %}
+
+{% block title %}
+Real-Bogus Trainer Page
+{% endblock %}
+
+{% block header %}
+Real-Bogus Trainer Page
+{% endblock %}
+
+{% block navigation %}
+Logged in as user: {{user.username}} (<a href="/accounts/logout/"> log out </a>)
+{% endblock %}
+
+{% block overview %}
+Please select a date from the list below.
+{% endblock %}
+
+{% block content %}
+<table border=0 width=90%>
+{% with "nscore"|add:userid as nscoreid %}
+{% for imagedate in trainer_dates %}
+<tr>
+<td><a
+href="/trainer/{{imagedate.date.year}}/{{imagedate.date.month}}/{{imagedate.date.day}}/?page=1">
+{{imagedate.date.year}}/{{imagedate.date.month}}/{{imagedate.date.day}}</a></td>
+{% with imagedate|get_attr:nscoreid as nscore %}
+<td>{{nscore}} out of {{imagedate.ncandidate}} candidates have been scored.</td></tr>
+{% endwith %}
+{% endfor %}
+{% endwith %}
+</table>
+{% endblock %}

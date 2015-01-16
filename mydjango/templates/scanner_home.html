@@ -1,0 +1,31 @@
+{% extends "base.html" %} 
+{% load mytags %}
+
+{% block header %}
+SkyMapper Transient-monitoring Home
+{% endblock %}
+
+{% block overview %}
+SkyMapper Transient search has been running for {{smtp_stats.n_night}} nights, imaged {{smtp_stats.n_field}} fields, and detected {{smtp_stats.n_candidate}} candidates.
+{% endblock %}
+
+{% block content %}
+<table cellspacing="0" cellpadding="0" border="0" width=600>
+<form action="" method="post" onSubmit=true>{% csrf_token %}
+<tr><td colspan=2>Select a date to view its list of candidates</td></tr>
+<tr><td><select name=smtp_night>{% for night in smtp_nights %}<option>{{night}}{% endfor %}</select></td>
+<td><center><input type=submit value="Go to Date"></center></td></tr>
+</form>
+</table>
+
+</br>
+</br>
+
+<table cellspacing="0" cellpadding="0" border="0" width=600>
+<form action="" method="post" onSubmit=true>{% csrf_token %}
+<tr><td colspan=2>Select a candidate to view its relavent information</td></tr>
+<tr><td><select name=smtp_candidate>{% for cand in smtp_candidates %}<option>{{cand}}{% endfor %}</select></td>
+<td><center><input type=submit value="Go to Candidate"></center></td></tr>
+</form>
+</table>
+{% endblock %}

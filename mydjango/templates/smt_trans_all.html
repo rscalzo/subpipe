@@ -1,0 +1,17 @@
+{% extends "smt_trans_table.html" %} 
+
+{% block content_top %}
+<div id="description">
+  <p>All SMT transients detected so far
+  <p>
+    <ul>
+      <li>{{stats.n_trans}} transient candidates detected </li>
+      <li>{% if stats.n_trans == stats.n_typed %}
+	All transients have been typed
+	{% else %}
+	{{stats.n_typed}} transients have been typed 
+	{% endif %}
+      </li>
+    </ul>
+</div>
+{% endblock %}

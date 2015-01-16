@@ -1,0 +1,41 @@
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/followup
+END
+admin.py
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/followup/admin.py
+END
+views.py
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/followup/views.py
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/followup/__init__.py
+END
+STAP_API.py
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/followup/STAP_API.py
+END
+tests.py
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/followup/tests.py
+END
+models.py
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/followup/models.py
+END

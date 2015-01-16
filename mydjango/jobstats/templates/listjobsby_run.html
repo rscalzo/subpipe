@@ -1,0 +1,39 @@
+{% extends "jobstats_base.html" %}
+{% load jobstats_tags %}
+
+{% block content %}
+<p>
+Click on the name of any subtraction to see its log file.<br>
+Click on a table header to sort the table by that quantity.<br>
+Click on a given failure stage or a failure condition to show only
+    those table entries that have that failure or failure condition.
+</p>
+
+<p>
+{% if jobfilters|length > 0%}
+    <h2>Results for {{ rows|length }} jobs in run {{ runtag }} satisfying filters:</h2>
+    <ul>{% for filt, val in jobfilters.items %}
+            <li class='codefont'>{{ filt }} = {{ val }}</li>
+    {% endfor %}</ul>
+{% else %}
+    <h2>Results for all {{ rows|length }} jobs in run {{ runtag }}</h2>
+{% endif %}
+</p>
+
+<table cellspacing=0>
+<thead><tr>
+    {% for header in headers %}<th scope="col" {{ header.class_attr }}>
+        {% if header.sortable %}<a href="{{ header.url|escape }}">{% endif %}
+        {{ header.text }}
+        {% if header.sortable %}</a>{% endif %}
+    </th>{% endfor %}
+</tr></thead>
+<tbody>
+    {% for row in rows %}<tr class={% cycle 'row1' 'row2' %}>
+        {% for item in row %}<td {{ item.html }}>
+            {% if item.url %}<a href='{{ item.url }}'>{{ item.data }}</a>
+            {% else %}{{ item.data }}{% endif %}
+        </td>{% endfor %}</tr>
+    {% endfor %}
+</table>
+{% endblock %}

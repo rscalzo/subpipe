@@ -1,0 +1,203 @@
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates
+END
+smt_pw_reset_done.html
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_pw_reset_done.html
+END
+smt_trans_table.html
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_trans_table.html
+END
+scanner_login.html
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/scanner_login.html
+END
+smt_pw_reset_email.html
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_pw_reset_email.html
+END
+scanner_logout.html
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/scanner_logout.html
+END
+scanner_date.html
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/scanner_date.html
+END
+trainer_rb.html
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/trainer_rb.html
+END
+smt_pw_reset_confirm.html
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_pw_reset_confirm.html
+END
+smt_login.html
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_login.html
+END
+smt_logout.html
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_logout.html
+END
+trainer_logout.html
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/trainer_logout.html
+END
+scanner_register.html
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/scanner_register.html
+END
+smt_base.html
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_base.html
+END
+smt_pw_reset_form.html
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_pw_reset_form.html
+END
+scanner_home.html
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/scanner_home.html
+END
+smt_register.html
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_register.html
+END
+404.html
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/404.html
+END
+trainer_register.html
+K 25
+svn:wc:ra_dav:version-url
+V 94
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/trainer_register.html
+END
+base.html
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/base.html
+END
+smt_home.html
+K 25
+svn:wc:ra_dav:version-url
+V 86
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_home.html
+END
+smt_pw_done.html
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_pw_done.html
+END
+base_scanner.html
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/base_scanner.html
+END
+trainer_rb_date.html
+K 25
+svn:wc:ra_dav:version-url
+V 93
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/trainer_rb_date.html
+END
+smt_trans_info.html
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_trans_info.html
+END
+scanner_candidate.html
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/scanner_candidate.html
+END
+scanner_register_success.html
+K 25
+svn:wc:ra_dav:version-url
+V 102
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/scanner_register_success.html
+END
+trainer_login.html
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/trainer_login.html
+END
+table_header.html
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/table_header.html
+END
+smt_register_success.html
+K 25
+svn:wc:ra_dav:version-url
+V 98
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_register_success.html
+END
+smt_pessto.html
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_pessto.html
+END
+smt_trans_all.html
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_trans_all.html
+END
+500.html
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/500.html
+END
+smt_trans_date.html
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/templates/smt_trans_date.html
+END

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}
+Real-Bogus Trainer Page - log in
+{% endblock %}
+
+{% block header %}
+Real-Bogus Trainer Page
+{% endblock %}
+
+{% block navigation %}
+You are not logged in or your account is not signed up for Real-Bogus classification.
+Please log in below.
+{% endblock %}
+
+{% block overview %}
+{% endblock %}
+
+{% block content %}
+<center>Please log in </center>
+<p>
+  <form action="" method="post">{% csrf_token %}
+    <label for="username">User name:</label>
+    <input type="text" name="username" value="" id="username">
+    <label for="password">Password:</label>
+    <input type="password" name="password" value="" id="password">
+
+    <input type="submit" value="login" />
+    <input type="hidden" name="next" value="{{ next|escape }}" />
+  </form>
+
+<p>
+<center>Or register <a href="/accounts/register/">here</a></center>
+
+{% endblock %}
+

@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/jobstats/templates
+END
+test.html
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/jobstats/templates/test.html
+END
+jobstats_base.html
+K 25
+svn:wc:ra_dav:version-url
+V 100
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/jobstats/templates/jobstats_base.html
+END
+displaylog.html
+K 25
+svn:wc:ra_dav:version-url
+V 97
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/jobstats/templates/displaylog.html
+END
+listjobsby_run.html
+K 25
+svn:wc:ra_dav:version-url
+V 101
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/jobstats/templates/listjobsby_run.html
+END
+base.html
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/jobstats/templates/base.html
+END

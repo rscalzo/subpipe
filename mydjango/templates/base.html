@@ -1,0 +1,55 @@
+<html><head><title>{% block title %}SkyMapper Transient-monitoring Page{% endblock %}</title>
+</head>
+
+<body bgcolor=#ffffff text=#000000>
+
+<center>
+<table cellspacing="5" cellpadding="5" border="0" width="90%">
+<tr>
+<td width=120 valign="bottom" nowrap><img src="http://msowww.anu.edu.au/skymapper/SkyMapper_files/SkyMapper_logo1.png" width="100" border="0" alt="SM logo"></a></td>
+<td valign="bottom" nowrap><h1>
+{% block header %}
+SkyMapper Transient-monitoring Page
+{% endblock %}
+</h1></td>
+</tr>
+</table>
+
+<p>
+<hr style="color: #000; height:1px;">
+<hr style="color: #000; height:1px; margin-top: 1px;">
+<p>
+
+{% block navigation %}
+<table border=0 width=90%>
+<tr><td width=75%></td>
+<td width=20%>logged in as user: {{user.username}}</td>
+<td width=5%><a href="/accounts/logout/"> log out </a></td>
+</tr></table>
+{% endblock %} 
+
+<p>
+<hr style="color: #000; height:1px;">
+<hr style="color: #000; height:1px; margin-top: 1px;">
+<p>
+
+{% block overview %}
+{% endblock %} 
+
+<p>
+<hr style="color: #000; height:1px;">
+<hr style="color: #000; height:1px; margin-top: 1px;">
+<p>
+
+{% block content %}
+{% endblock %}
+
+<p>
+<hr style="color: #000; height:1px;">
+<hr style="color: #000; height:1px; margin-top: 1px;">
+<p>
+
+{% block footer %}
+{% endblock %}
+
+</body></html>

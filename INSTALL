@@ -1,0 +1,140 @@
+-----------------------------------------------------------------------------
+SkyMapper Subtraction Pipeline INSTALL Document
+Version 0.9.0, created 2012 May 17 by RS (rscalzo@mso.anu.edu.au)
+-----------------------------------------------------------------------------
+
+This document describes a number of things you might want to know about how
+the pipeline code is installed, its external dependencies, etc.  At present
+the pipeline is installed on maipenrai and on miner, both Red Hat Linux
+systems.  If you ever need to port it to a different OS, things could get
+interesting.  Let RS know if for some reason this becomes necessary.
+
+
+I.  Installing a fresh checkout (w/pre-built external packages)
+
+   NB:  we prefer to run the production pipeline from tagged releases only.
+If you're updating the production version of the pipeline, please don't just
+svn update to the latest svn version, which may be some intermediate-stage
+experimental code with interesting problems, although we do our best to check
+in only working code.  Instead, make a fresh checkout of the most recent
+tagged pipeline version, which is sure to have been thoroughly vetted.
+
+   If you already have the external packages built, updating the source from
+a fresh svn checkout takes about 5 minutes.  This should be the case if you're
+just updating the code to a new version.  The commands below are given for
+C-style shells (csh, tcsh); lowercase shell variables $var are not defined
+explicitly, but refer to directories given by the user.
+
+[ ] Make a fresh svn checkout (latest tagged version)
+    svn checkout https://svn.mso.anu.edu.au/svn/skymapper/Code/Tags/subpipe/v0.9.0/
+[ ] Set $SUBPIPEHOME to the root of the svn checkout
+    setenv SUBPIPEHOME v0.9.0
+[ ] ln -s $extdir $SUBPIPEHOME/ext
+    where $extdir is the external package directory containing bin/, lib/ etc.
+    (now merged with the python virtual environment directory)
+[ ] source $SUBPIPEHOME/subpipe_env.csh (and/or put it in your .cshrc)
+[ ] cd $BRIANWCS/src; setenv EXTROOT $SUBPIPEHOME/ext; make install
+[ ] cd $SUBPIPEHOME/src/preproc; make
+    ln -s $SUBPIPEHOME/src/preproc/fits64to32_cal $SUBPIPEHOME/bin/fits64to32_cal
+    (NB: this doesn't work on maipenrai right now, some 32-vs-64-bit thing)
+    (Should be fine now)
+[ ] Enable R/B classifier by copying/linking model into $SUBPIPEHOME/etc:
+    ln -s $rf_file $SUBPIPEHOME/etc/randomforest.pkl
+    where $rf_file is the random forest python pickle file.
+    (this should be kept separately somewhere safe and backed up)
+[ ] mkdir $SUBPIPEHOME/mydjango/local
+    touch $SUBPIPEHOME/mydjango/local/__init__.py
+    ln -s $extdir/mydjango/settings_sensitive.py $SUBPIPEHOME/mydjango/local/settings_sensitive.py
+[ ] ln -s $SUBPIPEHOME/ext/lib/js/flot-0.7 $SUBPIPEHOME/mydjango/staticfiles/js/flot
+    ln -s $SUBPIPEHOME/ext/lib/js/jquery-1.7.2.js $SUBPIPEHOME/mydjango/staticfiles/js/jquery.js 
+[ ] mkdir $SUBPIPEHOME/data
+[ ] Copy test data suite directory (containing new/, ref/ etc.) to $test_data
+[ ] ln -s $SUBPIPEHOME/data/new $test_data/new
+[ ] ln -s $SUBPIPEHOME/data/ref $test_data/ref
+[ ] Initialize sqlite3 test harness database if necessary:
+    mkdir -p $SUBPIPEHOME/data/mydjango/db
+    cd $SUBPIPEHOME/mydjango; python manage.py syncdb
+    cd $SUBPIPEHOME/mydjango/jobstats; init_skymapper_fields.py
+[ ] $SUBPIPEHOME/subpipe_master.py
+    to run pipeline on test data set and check results.  ^C when it's done.
+
+This could probably be wrapped into some kind of install script, but I'll
+deal with that if we have to do this more often than once a month.
+
+
+II. Building a new external package directory
+
+   You poor thing.  This is the most time-consuming part of the process.
+Luckily it doesn't need to be done that often.  If I were you I'd check that
+this step is really necessary in your case, e.g. installing the pipeline on a
+new machine or recovering from a catastrophic crash.  The known external
+dependencies of the pipeline should live in $SUBPIPEHOME/ext or should be
+symlinked from there.  Here's how to make them.
+
+(a) Setting up a python virtualenv for the Python dependencies
+
+   subpipe depends in part on specific versions of certain packages that are
+also used system-wide, such as Django, pyfits, and pyraf.  Changes or updates
+to these system-wide packages can therefore break things in our code which are
+not *really* problems.  This is particularly true with python, which is why we
+install our code wrapped in a python virtual environment.  More details at
+
+   http://virtualenv.readthedocs.org/en/latest/
+
+NB:  The external python packages which require specific versions will need
+to be built from source -- they may not be available on the Internet anymore
+in versions that are backwards-compatible with subpipe.  Find them at
+
+   maipenrai:/export/maipenrai/skymap/skymap/external_packages/src/
+
+If you're doing this from scratch, here are the steps to follow.
+
+[ ] Install the latest version of virtualenv somewhere locally:
+    cd $LOCAL/src
+    curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-1.11.6.tgz
+    tar xzf virtualenv-1.11.6.tgz
+    cd virtualenv-1.11.6
+    python setup.py install --prefix=$LOCAL
+[ ] Create the external package directory, which we called $extdir above:
+    virtualenv $extdir
+[ ] Activate the virtual environment to insulate us from /usr/local/:
+    source $extdir/bin/activate.csh
+[ ] Run "pip install $pkg" for the following values of $pkg:
+    ** nose
+    ** numpy
+    ** scipy
+    ** matplotlib
+    ** psycopg2
+    ** pyraf
+[ ] Copy source from maipenrai and run
+        python setup.py install --prefix=$extdir
+    for the following python packages:
+    ** milk         [subpipe uses:  0.4.2]
+    ** milksets     [subpipe uses:  0.1.3]
+    ** processing   [subpipe uses:  0.5.2]
+    ** astLib       [subpipe uses:  0.6.0]
+    ** ephem        [subpipe uses:  3.7.5.2]
+    ** django       [subpipe uses:  1.3.1]
+    ** pyfits       [subpipe uses:  2.4.0]
+
+(b) Setting up all other binaries
+
+   These will probably all need to be made from source.  You can find the
+source code for the specific versions we use in
+
+   maipenrai:/export/maipenrai/skymap/skymap/external_packages/src/
+
+[ ] cfitsio:  make all in ext/src/cfitsio-3.0 and copy libcfitsio.a to ext/lib
+[ ] wcslib:  make all in ext/src/wcslib-3.5/C/ and copy libwcs.a to ext/lib
+    (may need to edit Makefile if this system isn't Linux)
+[ ] swarp:  ./configure and make all in ext/src/swarp-2.15.7
+    (or get sysman to do it) and copy swarp to ext/bin
+    (NB:  only swarp-2.15.7 works with TNX headers, so be careful)
+[ ] sextractor:  ./configure and make all in ext/src/sextractor-2.8.6
+    (or get sysman to do it) and copy sextractor to ext/bin
+[ ] hotpants:  make all in ext/src/hotpants_v5.1.10
+    (or get sysman to do it) and copy hotpants to ext/bin
+[ ] cdsclient:  ./configure and make all in ext/src/cdsclient-3.6
+    then mkdir ext/bin/cdsclient and copy binaries there
+[ ] ucac2:  make all in ext/src/ucac2 and copy u2access to ext/bin
+[ ] astrometry.net:  get sysman to do this for you, it's horrendous

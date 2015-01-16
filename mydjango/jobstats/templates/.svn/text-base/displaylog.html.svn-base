@@ -1,0 +1,22 @@
+{% extends "jobstats_base.html" %}
+{% load jobstats_tags %}
+
+{% block naviheader2 %}
+<div class='navileft'>
+  <a href="{% url joblist jobname|get_run %}">Go
+    to run {{jobname|get_run}}</a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<p>
+<h2>Displaying log file for {{ jobname }}</h2>
+</p>
+
+<pre class='logfile'>
+{% for line in logcontent %}
+{{ line }}{% endfor %}
+</p>
+
+{% endblock %}

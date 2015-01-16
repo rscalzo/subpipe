@@ -1,0 +1,107 @@
+{% extends "base.html" %} 
+{% load mytags %}
+
+{% block header %}
+Transient Candidate - {{candstats.name|upper}}
+{% endblock %}
+
+{% block navigation %}
+<table border=0 width=90%>
+<tr><td width=75%><a href="/scanner/"> Go to Scanner Home </a></td>
+<td width=20%>logged in as user: {{user.username}}</td>
+<td width=5%><a href="/accounts/logout/"> log out </a></td>
+</tr>
+</table>
+<table border=0 width=90%>
+<tr><td>
+Go to the candidate list on {% for night in candstats.nights %}&nbsp;&nbsp;&nbsp;<a href="/scanner/{{night.year}}/{{night.month}}/{{night.day}}/">
+{{night.year}}-{{night.month}}-{{night.day}}<a>&nbsp;&nbsp;&nbsp;
+{% endfor %}
+</td><tr>
+</table>
+{% endblock %}
+
+{% block overview %}
+<table border=0 width=90% cellspacing=2 cellpadding=2>
+<tr><td>
+<table border=0 cellspacing=2 cellpadding=2>
+<tr><td colspan=3>Name: &nbsp;&nbsp;&nbsp;{{candstats.name|upper}} </td></tr>
+<tr><td colspan=3>J2000: &nbsp;&nbsp;&nbsp;{{candstats.ra_best|as_sixty:"hour"}}&nbsp;&nbsp;&nbsp;&nbsp;{{candstats.dec_best|as_sixty:"degree"}}</td></tr>
+<tr><td colspan=3>Observed on {{candstats.n_night}} nights.</td></tr>
+
+<tr><td colspan=3><a href="http://simbad.u-strasbg.fr/simbad/sim-coo?output.format=HTML&Coord=02+42+16.27+%2B+36+04+12.65&CooEpoch=2000&CooEqui=2000&Radius=0.01&Radius.unit=deg&CooFrame=FK5">Check SIMBAD objects</a></td></tr>
+<tr><td width=50%><IMG SRC="http://skyservice.pha.jhu.edu/DR10/ImgCutout//getjpeg.aspx?ra={{candstats.ra_best}}&dec={{candstats.dec_best}}&scale=0.39612&width=300&height=300&opt=GL&query=G"> </td>
+<td><IMG SRC="http://archive.stsci.edu/cgi-bin/dss_search?f=gif&v=poss2ukstu_red&r={{candstats.ra_best}}&d={{candstats.dec_best}}&e=J2000&h=5.0&w=5.0&c=none"></td>
+<td><td colspan=2><form name=twomassget method=get target="_new" action="http://irsa.ipac.caltech.edu/cgi-bin/2MASS/IM/nph-im_pos">
+	<input type="hidden" name=type value="at">
+	<input type="hidden" name=ds value="asky">
+	<input type="hidden" name=POS value="{{candstats.ra_best}} {{candstats.dec_best}}">
+	<input type="hidden" name=subsz value="396">
+	<input type="submit" value="Check 2MASS">
+	<input type="hidden" name=date value="">
+	<input type="hidden" name=scan value="">
+	<input type="hidden" name=coadd value="">
+	<input type="hidden" name=key value="">
+	<input type="hidden" name=band value="A">
+	</form>
+</td><tr>
+<tr><td colspan=2><form name=sdssnav method="get" target="search" action="http://skyserver.sdss3.org/dr8/en/tools/chart/navi.asp?">
+	<input type=hidden name=opt value="">
+	<input type=hidden name=ra value={{candstats.ra_best}} >
+	<input type=hidden name=dec value={{candstats.dec_best}} >
+	<input type=hidden name=scale value="0.773438">
+	<input type=submit value="Check SDSS Navigate">
+	</form>
+</td><tr>
+</table>
+</td></tr>
+<tr><td>
+<img src="{{MEDIA_URL}}{{candstats.lc}}">
+</td></tr>
+<tr><td>Currently classified as: {{candstats.type_best}}</td></tr>
+<form name=userinput method=POST action="">{% csrf_token %}
+<tr><td>
+         {% for objtype in objtypes %}
+	 <input type=radio name=usertype value={{objtype.type}}
+	 {% if objtype.type == candstats.type_best %} checked {% endif %}>{{objtype.type}}
+	 {% endfor %}
+</td></tr>
+<tr><td>You may add a brief comment (no more than 50 characters) here:<br>
+	 <input type=text name=usercomment size=80 maxlength=50 value=''></input>
+</td></tr>	
+<tr><td>
+         <input type=submit name=submit value="Submit">
+	 <input type=submit name=submit value="Submit and go back to {{candstats.nights.0.year}}-{{candstats.nights.0.month}}-{{candstats.nights.0.day}}">
+</td></tr>
+
+</form>
+</td><tr>
+</table>
+{% endblock %}
+
+{% block content %}
+<table border=0 width=90%>
+<tr>{% for night in candstats.nights %}
+{% if night == candstats.shownight %}
+<td width=150 align=center bgcolor=#CCCCCC><font color=#000>Showing {{night.year}}-{{night.month}}-{{night.day}} </font></td>
+{% else %}
+<td width=150 align=center><a href="?page={{night.year}}-{{night.month}}-{{night.day}}/">
+{{night.year}}-{{night.month}}-{{night.day}}
+<a></td>
+{% endif %}
+{% endfor %}<td></td><tr>
+</table>
+<table border=1 width=90% cellspacing=2 cellpadding=2>
+{% for cand in canddata %}
+<tr>
+<td width=25%><img src="{{MEDIA_URL}}{{cand.thumb_new}}" width=100%></td>
+<td width=25%><img src="{{MEDIA_URL}}{{cand.thumb_ref}}" width=100%></td>
+<td width=25%><img src="{{MEDIA_URL}}{{cand.thumb_diff}}" width=100%></td>
+<td width=25%><table border=1 width=100%>
+        <tr><td>filter</td><td>mag</td><td>mag_err</td><td>fwhm</td></tr>
+        <tr><td>{{cand.filter}}</td><td>{{cand.mag|floatformat:2}}</td><td>{{cand.mag_err|floatformat:2}}</td><td>{{cand.fwhm|floatformat:2}}</td>
+	</table>	
+</td><tr>
+{% endfor %}
+</table>
+{% endblock %}

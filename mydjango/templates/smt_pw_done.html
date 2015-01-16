@@ -1,0 +1,8 @@
+{% extends "smt_base.html" %}
+
+{% block content %}
+<div id="description">
+  <p>Your password has been set.  You may go ahead and 
+    <a href="{% url home %}accounts/login/?next={% url home %}"> log in </a> now.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "smt_base.html" %}
+
+{% block content %}
+<div id="description">
+  <p>If you want to reset your password, please specify your email address below to
+    receive the instructions.</p>
+</div>
+
+<div id="pageconten">
+  <center>
+    <form action="" method="post">{% csrf_token %}
+      {{ form.email.errors }}
+      <p><label for="id_email">E-mail address:</label> {{ form.email }}
+	<input type="submit" value="Reset password" /></p>
+    </form>
+  </center>
+</div>
+{% endblock %}

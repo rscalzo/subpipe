@@ -1,0 +1,41 @@
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/SMTP_trainer
+END
+manage.py
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/SMTP_trainer/manage.py
+END
+views.py
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/SMTP_trainer/views.py
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/SMTP_trainer/__init__.py
+END
+settings.py
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/SMTP_trainer/settings.py
+END
+urls.py
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/SMTP_trainer/urls.py
+END
+dbrouter.py
+K 25
+svn:wc:ra_dav:version-url
+V 87
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/SMTP_trainer/dbrouter.py
+END

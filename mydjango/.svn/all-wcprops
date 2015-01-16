@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango
+END
+manage.py
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/manage.py
+END
+wsgi.py
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/wsgi.py
+END
+views.py
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/views.py
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/__init__.py
+END
+settings.py
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/settings.py
+END
+smt.wsgi
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/smt.wsgi
+END
+urls.py
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/urls.py
+END
+settings_production.py
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/skymapper/!svn/ver/5081/Code/Tags/subpipe/v1.0.3/mydjango/settings_production.py
+END
