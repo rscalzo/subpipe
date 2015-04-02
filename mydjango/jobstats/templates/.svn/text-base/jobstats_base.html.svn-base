@@ -1,8 +1,0 @@
-{% extends "smt_base.html" %}
-
-{% block title %}SkyMapper SN Search Job Stats{% endblock %}
-{% block htmlhead %}
-<link rel="stylesheet" type="text/css" href="{{STATIC_URL}}css/jobstats.css" />
-{% endblock %}
-
- 

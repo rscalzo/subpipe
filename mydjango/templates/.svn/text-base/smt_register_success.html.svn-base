@@ -1,7 +1,0 @@
-{% extends "smt_base.html" %}
-
-{% block content %}
-Hello, {{username}}
-<p>
-  {{message|safe}}
-{% endblock %}

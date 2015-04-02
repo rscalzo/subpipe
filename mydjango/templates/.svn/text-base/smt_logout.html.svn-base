@@ -1,8 +1,0 @@
-{% extends "smt_base.html" %}
-
-{% block content %}
-<div id="description">
-  <p>You are now logged out. 
-  <p>Click <a href="{% url home %}accounts/login/?next={% url home %}"> here </a> to log back in. 
-</div>
-{% endblock %}
