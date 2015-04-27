@@ -110,7 +110,7 @@ def transients_date(request,year,month,day):
     n_jobs=0
     n_goodjobs=0
     for pointing in pointings:
-        jobs=js.PipelineJob.objects.filter(pointing=pointing).select_related('exit_status')
+        jobs=js.PipelineJob.objects.filter(jobname__contains='sub',pointing=pointing).select_related('exit_status')
         n_jobs=n_jobs+jobs.count()
         n_goodjobs=n_goodjobs+jobs.filter(exit_status__description='Success').count()
         
@@ -147,13 +147,13 @@ def transient_info(request,trans_name):
     try:
         ptrans=fu.Transient.objects.filter(id__lt=trans.id).reverse()[0]
         prevtrans=ptrans.name
-    except ObjectDoesNotExist:
+    except: # ObjectDoesNotExist:
         prevtrans=None
 
     try:
         ntrans=fu.Transient.objects.filter(id__gt=trans.id)[0]
         nexttrans=ntrans.name
-    except ObjectDoesNotExist:
+    except: # ObjectDoesNotExist:
         nexttrans=None
        
     xsientnames = FilenamesXsient(trans.name,trans.field.id,trans.ccd)
