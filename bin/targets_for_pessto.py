@@ -28,7 +28,7 @@ def main():
     output=args.output
     
     now=datetime.datetime.now()
-    cands=fu.Transient.objects.filter(type__type__contains='Cand')
+    cands=fu.Transient.objects.filter(type__type='Cand')
     
 
     targets=[]
