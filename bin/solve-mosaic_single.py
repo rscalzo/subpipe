@@ -50,7 +50,7 @@ hdulist.close()
 
 # RS 2011/04/19:  Now assumes solve-field is in the user's $PATH.
 # RS 2011/04/21:  Now uses --no-fits2fits to avoid filling up /tmp.
-cmd=("solve-field --parity neg --no-plots --no-fits2fits "
+cmd=("/usr/local/astrometry-old/bin/solve-field --parity neg --no-plots --no-fits2fits "
      + filename +
      " --scale-low 0.45 --scale-high 0.5 --scale-units app --ra "
      + str(ra) + " --dec " + str(dec) + " --radius "
