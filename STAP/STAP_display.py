@@ -219,11 +219,14 @@ def sky2xy(imname,ras,decs):
     nobj=len(ras)
     for ind in range(nobj):
         cmd="%s %f %f"%(cmd,ras[ind],decs[ind])
+    cmd_orig = cmd
     cmd = cmd.split(" ")
     process=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     (stdoutstr,stderrstr) = process.communicate()
     status = process.returncode
     if status != 0:
+        print cmd_orig, "failed with the following message:"
+        print stderrstr
         print "Couldn't convert ra/dec to image coordinates"
         return [[-999]*nobj,[-999]*nobj]
     else:
