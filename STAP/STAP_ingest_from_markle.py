@@ -82,7 +82,7 @@ def main():
             help="keep the contents of /ramdisk/workdir for debugging?")
     parser.add_argument('--production', action='store_true', default=False,
             help="run in production mode, importing from current UT date?")
-    parser.add_argument('--imageid', default='53|89|805',
+    parser.add_argument('--imageid', default='53|89|805|053|089|169',
             help="only retrieve images with specified imageid") 
     args = parser.parse_args()
     print "Using pyfits version", pyfits.__version__
@@ -443,7 +443,7 @@ def fetch_schedule_logs(date):
     return status, glob.glob("{0}/SM_LOGFILE.{1}*".format(
                              local_scheduler_log_path, date))
 
-def ls_remote(acct, remotepath, imageid='53|89|805'):
+def ls_remote(acct, remotepath, imageid='53|89|805|053|089|169'):
     """Determine which files need to be ingested.
 
         acct:  e.g., "skymap@markle", or None if image is local
