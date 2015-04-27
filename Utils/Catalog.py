@@ -793,7 +793,7 @@ class APASSObject(PGRecord, SkymapperCalibStar):
     _dbhost = 'martini'
     _dbuser = 'untrusted'
     _dbpw = 'trustno1'
-    _sqlquery = "SELECT * FROM apass_dr6 WHERE " \
+    _sqlquery = "SELECT * FROM apass_dr7_twomass WHERE " \
                 "q3c_radial_query(ra, decl, %s, %s, %s)"
 
     _sql_fields = \
