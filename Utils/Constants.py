@@ -72,7 +72,7 @@ class Imager(object):
     # scheduling calculations.
     overhead = 20                   # Observation overhead (seconds)
     min_airmass = 1.0               # Minimum airmass at which to observe
-    max_airmass = 2.0               # Maximum airmass at which to observe
+    max_airmass = 1.4               # Maximum airmass at which to observe
     priority_thresh = 50.0          # Priority threshold at which to observe
 
     min_alt = np.arcsin(1.0/max_airmass)*180/np.pi
@@ -96,7 +96,7 @@ def sso_sitegen():
 
 sso = sso_sitegen()
 
-follow_types = ['Cand', 'SN', 'Ia', 'IIn', 'SLSN']
+follow_types = ['Cand', 'SN', 'Ia', 'Ibc', 'II', 'IIn', 'IIP', 'IIL', 'SLSN']
 
 
 # ----------------------------------------------------------------------------
@@ -135,7 +135,7 @@ class PipelinePath(object):
     scratch = os.environ["SUBSCRATCH"]      # Scratch space (/ramdisk)
     scratchetc = scratch + "/etc"
     # Configuration files for various external programs
-    SEx_files = [ "STAP_SEx.sex", "STAP_SEx.nnw", "STAP_SEx.par",
+    SEx_files = [ "default.conv","STAP_SEx.sex", "STAP_SEx.nnw", "STAP_SEx.par",
                   "gauss_1.5_3x3.conv", "gauss_2.0_3x3.conv",
                   "gauss_2.0_5x5.conv", "gauss_2.5_5x5.conv",
                   "gauss_3.0_5x5.conv", "gauss_3.0_7x7.conv",
@@ -412,7 +412,7 @@ class FilenamesSub(Filenames):
             # We won't be able to get everything but we may not need it all.
             # This means we need to watch which FilenamesSub instances have
             # the airmass, exptime, etc. attributes defined.
-            match = re.match(self.subnameregex, subid)
+            match = re.search(self.subnameregex, subid)
             if not match:
                 raise TrackableException("Bad 'subid' input to FilenamesSub")
             self.basefname = ''
@@ -673,7 +673,7 @@ class SkymapperFieldCenter(AsciiRecord, CatalogEntry):
         # This has been tuned to let a few new fields in each night,
         # gradually.  (Don't penalize high-cadence follow-up fields.)
         if self.cadence > 2.0:
-            priority *= (1.0 - 0.8/(1.0 + np.exp((60.0-dt)/15.0)))
+            priority *= (1.0 - 0.45/(1.0 + np.exp((60.0-dt)/15.0)))
         if verbose:  print "# >> {:.1f} (refcache)".format(priority)
         # (advanced:)  What is the expected point-source depth for this field?
         # print "field", self.id, "last observed", ephem.Date(self.last_observed).datetime()
