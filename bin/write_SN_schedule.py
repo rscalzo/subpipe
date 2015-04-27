@@ -53,16 +53,21 @@ def read_schedule_fields():
     # as these may be modified at any time (particularly follow-up fields).
     fields, fieldsets = [ ], { }
     for fsetname, fname, cadence, cwidth in [
-            ("SkyMapper",   "skymapper_snfields.txt",   3.0, 1.0),
-            ("LSQ overlap", "skymapper_lsqoverlap.txt", 3.0, 1.0),
+            ("SkyMapper",   "skymapper_snfields.txt",   0.5, 0.2),
+            # ("SkyMapper",   "skymapper_snfields_snzoo.txt",   0.5, 0.1),
+            # ("SkyMapper",   "skymapper_20150201_hacked.txt",   4.0, 0.2),
+            # ("SkyMapper",   "skymapper_snfields_cosmology.txt",   3.0, 1.0),
             ("Follow-up",   "skymapper_followup.txt",   1.0, 0.1),
+            ("LSQ overlap", "skymapper_lsqoverlap.txt", 3.0, 1.0),
             ("K1 overlap",  "skymapper_kepler1.txt",    2.0, 0.5),
-            ("K3 overlap",  "skymapper_kepler3.txt",    3.0, 0.2), ]:
+            ("K3 overlap",  "skymapper_kepler3.txt",    3.0, 0.2),
+            ]:
         absfn = Constants.PipelinePath.etc + '/' + fname
         ftmp = Constants.SkymapperFieldCenter.read_ascii_file(absfn)
         for f in ftmp:  f.set_cadence(cadence, cwidth)
-        fields = fields + ftmp
-        fieldsets[fsetname] = ftmp
+        # HACK:  just observe SN Zoo fields and follow-up fields for now
+        if len(fields) < 2:  fields = fields + ftmp
+        # fields = fields + ftmp
         fieldidsets[fsetname] = [f.id for f in ftmp]
     SKMfields, LSQfields, TRGfields, K1fields, K3fields = fieldidsets
     # Read in state information about when fields were last observed.
@@ -178,7 +183,8 @@ def write_schedule_singleobs(verbose=False, dump_state=False):
 
 
 def write_schedule_deadreckon(verbose=False, dump_state=False,
-                              start_night=None, stop_night=None):
+                              start_night=None, stop_night=None,
+                              exclude_moon=True):
     """Writes a schedule file to stdout."""
 
     # Read in fields from disk
@@ -220,7 +226,7 @@ def write_schedule_deadreckon(verbose=False, dump_state=False,
     moonrise = sso.next_rising(moon, use_center=True)
     moonset = sso.next_setting(moon, use_center=True)
     # If moon is more than half full, we need to see when it's up.
-    if 0:  # if moon.moon_phase > 0.5:
+    if moon.moon_phase > 0.5 and exclude_moon:
         # If the moon is *already* up at the start of the night, then the next
         # moon rising will be *after* the next moon setting.  In that case,
         # we should start observations after it sets.
@@ -255,6 +261,7 @@ def write_schedule_deadreckon(verbose=False, dump_state=False,
         print "# Initializing pyephem FixedBody elements...";
         sys.stdout.flush()
     for f in fields:  f.init_ephem_body()
+    print "# Attempting to schedule", len(fields), "fields"
     # Main event loop
     my_schedule, sched_time, n = [ ], night_start, 1
     while sched_time < night_end:
@@ -264,7 +271,9 @@ def write_schedule_deadreckon(verbose=False, dump_state=False,
         # Check what's up at this time that we haven't observed
         avail_fields = [f for f in fields if f not in my_schedule
                         and f.priority > priority_thresh]
-        if len(avail_fields) < 1:  break
+        if len(avail_fields) < 1:
+            sched_time = ephem.Date(sched_time + fields[0].obs_length)
+            continue
         # Do follow-up fields if they're above the priority threshold.
         # Else, pick the highest-priority field that's up and observe it.
         priority = np.array([f.priority for f in avail_fields])
@@ -311,7 +320,8 @@ def write_schedule_deadreckon(verbose=False, dump_state=False,
                           ra=str(f.body.a_ra),
                           dec=str(f.body.a_dec),
                           exp=f.exptime[filt],
-                          f=filt, rot=0, T="3RD_PARTY", n=n, prog=42)
+                          T="BAD_SEEING", # T="3RD_PARTY",
+                          f=filt, rot=0, n=n, prog=42)
             n += 1
 
     # If we need to dump state, do that last.
@@ -365,7 +375,8 @@ def main():
             write_schedule_deadreckon(verbose=args.verbose,
                                       dump_state=args.dump_state,
                                       start_night=args.start_night,
-                                      stop_night=args.stop_night)
+                                      stop_night=args.stop_night,
+                                      exclude_moon=False)
         sys.stdout = tmpstdout
         with open(sched_file) as whatwejustdid:
             for line in whatwejustdid:
@@ -375,7 +386,8 @@ def main():
         write_schedule_deadreckon(verbose=args.verbose,
                                   dump_state=args.dump_state,
                                   start_night=args.start_night,
-                                  stop_night=args.stop_night)
+                                  stop_night=args.stop_night,
+                                  exclude_moon=False)
 
 if __name__ == '__main__':
     main()
