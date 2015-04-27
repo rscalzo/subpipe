@@ -107,7 +107,7 @@ class RealBogus (FITSRecord,KeywordRecord,CatalogEntry):
     _milk_features = [ f[0] for f in _cand_fields ]
 
     # rbscore threshold over which an object is considered Real
-    rbscore_thresh = 40
+    rbscore_thresh = 50
 
     def __init__(self, *args, **kwargs):
 
