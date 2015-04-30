@@ -28,6 +28,9 @@ def svn_version():
     proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
     return proc.communicate()[0]
 
+# Is this a production install?
+is_production_install = bool(int(os.environ["SUBPIPE_PRODUCTION_INSTALL"]))
+
 
 # ----------------------------------------------------------------------------
 #          Imager constants like gain, well depth, pixel scale etc.
@@ -107,6 +110,7 @@ follow_types = ['Cand', 'SN', 'Ia', 'Ibc', 'II', 'IIn', 'IIP', 'IIL', 'SLSN']
 class PipelinePath(object):
     """Namespace wrapper for pipeline directory structure"""
     home = os.environ["SUBPIPEHOME"]
+    ext = os.environ["SUBPIPEEXT"]
     bin = home + "/bin"                     # Binaries of useful executables
     etc = home + "/etc"                     # Global configuration files
     data = home + "/data"                   # Pipeline staging + output
@@ -127,6 +131,7 @@ class PipelinePath(object):
     skybot = cand + "/skybot"               # Skybot cache data
     sdss = cand + "/sdss"                   # SDSS cache data
     django = home + "/mydjango"             # Source path for django website
+    django_static = django + "/staticfiles" # Source path for django statics
     django_data = data + "/mydjango"        # django website related data
     django_db = django_data + "/db/test.db" # SQLite3 database for django
     django_media = django_data + "/media"   # Files uploaded by django users
