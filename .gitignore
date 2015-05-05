@@ -1,0 +1,21 @@
+# The user's environment settings
+subpipe_env_*.csh
+
+# C object files and libraries
+*.so
+*.o
+*.a
+
+# Python byte-compiled files
+*.pyc
+
+# Soft-linked Javascript libraries
+jquery.js
+flot
+
+# Edited text files
+*~
+
+# Leftover svn files
+.svn
+*.svn-base
