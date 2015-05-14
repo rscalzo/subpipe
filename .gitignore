@@ -9,12 +9,34 @@ subpipe_env_*.csh
 # Python byte-compiled files
 *.pyc
 
+# Top level data directories
+data
+ext
+
+# Edited text files and temporary swap files
+*~
+.*.swp
+
+# Binary executables that need to be built, along with any versions of those
+# in build directories which we may have forgotten to clean up
+bin/fits64to32_cal
+src/preproc/fits64to32_cal
+WCS/bin/brian_fitwcs
+WCS/bin/brian_xi_eta
+WCS/bin/finalmatch
+WCS/bin/starmatch_new
+WCS/src/brian_fitwcs
+WCS/src/brian_xi_eta
+WCS/src/finalmatch
+WCS/src/starmatch_new
+
 # Soft-linked Javascript libraries
 jquery.js
 flot
 
-# Edited text files
-*~
+# Binary files I'm not sure we need to have in version control?
+etc/forestpickles
+etc/randomforest.pkl
 
 # Leftover svn files
 .svn

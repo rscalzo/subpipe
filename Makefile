@@ -1,6 +1,6 @@
 clean:
-	find . | grep '~$$' | xargs rm -rf
-	find . | grep '\.pyc$$' | xargs rm -rf
+	find STAP Utils mydjango | grep '~$$' | xargs rm -rf
+	find STAP Utils mydjango | grep '\.pyc$$' | xargs rm -rf
 
 newref:
 	rm -rf data/ref
