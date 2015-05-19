@@ -131,6 +131,8 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
+    # RS 2015/05/19:  South database migration for updating models
+    'south',
     # RS:  User-defined apps
     "mydjango.jobstats",
     "mydjango.followup",
