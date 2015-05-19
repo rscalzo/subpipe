@@ -161,7 +161,11 @@ def main():
             (is_good_sub, sub_glob, sub_files),
     ]:
         for fname in glob.glob(CPP_glob):
-            hdr = pyfits.getheader(fname)
+            try:
+                hdr = pyfits.getheader(fname)
+            except IOError:
+                print "ERROR -- couldn't open", fname, "-- may be corrupt"
+                continue
             seeing, maglim = None, None
             keepme = select_func(hdr)
             if 'SEEING' in hdr:
