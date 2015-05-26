@@ -29,6 +29,7 @@ parser.add_argument('--Nfolds', metavar='N', type=int, default=1,
 args = parser.parse_args()
 
 vtag = RealBogus.version_tag
+vtag = "v0.8.4a"
 
 
 # ----------------------------------------------------------------------------
@@ -90,6 +91,8 @@ def train_rf (candlist, Nfolds = 1, return_label=False):
     # Before we start we'd like to clean up the features, get rid of linearly
     # independent features, etc., to make training faster and more reliable.
     # (rf is a binary learner, so transform it into a multi-class classifier)
+    # RS 2015/03/17:  We only need binary classifications, and we'd like a
+    # floating point score, so no need to transform to multi-class!
     from milk.supervised.classifier import ctransforms
     from milk.supervised.normalise import chkfinite, interval_normalise
     from milk.supervised.featureselection \
@@ -97,7 +100,8 @@ def train_rf (candlist, Nfolds = 1, return_label=False):
     learner = ctransforms ( chkfinite(),
                             featureselector(linear_independent_features),
                             sda_filter(),
-                            one_against_one(randomforest.rf_learner()) )
+                            randomforest.rf_learner() )
+                            # one_against_one(randomforest.rf_learner()) )
 
     if Nfolds > 1:
         # Run N-fold cross-validation with this learner.

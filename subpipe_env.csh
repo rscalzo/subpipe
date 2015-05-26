@@ -33,6 +33,10 @@ setenv SUBPIPEEXT ${SUBPIPEHOME}/ext
 #                The baseline production pipeline environment
 # ----------------------------------------------------------------------------
 
+# By default, this is a production install and we should be using the real
+# Apache webserver, the real Postgres backend to Django, etc.
+setenv SUBPIPE_PRODUCTION_INSTALL 1
+
 # Paths that should always be in $PATH.  Make sure $LOCAL/bin is first,
 # we may occasionally override system defaults there.
 setenv PATH ${SUBPIPEEXT}/bin:${PATH}:/bin:/usr/bin:/usr/local/bin:.

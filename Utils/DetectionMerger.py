@@ -234,7 +234,7 @@ class DetectionMerger(object):
         runtag = ""
         bkgsig = newheader["BKGSIG"]
         # RS 2014/11/10:  HACK to work in catalog space
-        if runtag not in newheader:
+        if 'RUNTAG' not in newheader:
             newheader.update('RUNTAG', 'catspace', '')
         try:
             kw_missing = [kw for kw in
@@ -552,7 +552,7 @@ class DetectionMerger(object):
                         objname=objects[matchidx[i]].name
                     else:
                         objname=objects[matchidx[i]]
-                    if update or not self.name_registry[sources[i].id].has_key("autotype"):
+                    if update: # or not self.name_registry[sources[i].id].has_key("autotype"):
                         comment = format_comment(sources[i].name, tag,
                                                  "{0:.1f} arcsec from {1} {2} {3}".format
                                                  (dist[i], objsource, objtype, objname))
@@ -656,8 +656,9 @@ class DetectionMerger(object):
                 
                 match_objtype(sources,sdss_star,1.0,"Star","SDSS DR9","Star")
                 match_objtype(sources,sdss_qso,1.0,"QSO","SDSS DR9","QSO")
-                match_objtype(sources,sdss_xsc,5.0,"Galaxy","SDSS DR9","Cand",update=False)
-                match_objtype(sources,sdss_psc,1.0,"PointSource","SDSS DR9","Star",update=False)
+                #disable for now
+                #match_objtype(sources,sdss_xsc,5.0,"Galaxy","SDSS DR9","Cand",update=False)
+                #match_objtype(sources,sdss_psc,1.0,"PointSource","SDSS DR9","Star",update=False)
 
  
     def compile_roidxchcke(self, candsfnamelist):

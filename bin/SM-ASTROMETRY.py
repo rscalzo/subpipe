@@ -229,7 +229,9 @@ dec=prihdr['DEC']
 hdulist.close()
 
 
-cmd='solve-field -T --parity neg --no-plots --no-fits2fits '+  useext + ' --scale-low .493 --scale-high 0.501 --scale-units app --ra ' + ra + ' --dec ' + dec + ' --radius 15 --overwrite --use-sextractor --sextractor-path /usr/local/bin/sex -N ' + solvedfits
+cmd='/usr/local/astrometry-old/bin/solve-field -T --parity neg --no-plots --no-fits2fits '+  useext + \
+' --scale-low .493 --scale-high 0.501 --scale-units app --ra ' + ra + ' --dec ' \
++ dec + ' --radius 15 --overwrite --use-sextractor -N ' + solvedfits
 [status,stdoutstr]=STAP_callexternal(cmd,timeout=600,getstdout=True,combinestderr=True)
 print stdoutstr
 if status !=0 :

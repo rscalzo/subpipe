@@ -8,6 +8,7 @@
 # ============================================================================
 
 import re
+import os
 import pyfits
 import psycopg2
 import psycopg2.extras
@@ -130,12 +131,17 @@ class AsciiRecord(BaseRecord):
         return objlist
 
     @staticmethod
-    def write_ascii_file(fname, objlist,header=False):
-        with open(fname,"w") as file:
+    def write_ascii_file(fname, objlist,header=False,append=False):
+        if append and os.path.exists(fname): 
+            mode="a"
+        else: 
+            mode="w"
+        with open(fname,mode) as file:
             if header and len(objlist)>0:
                 file.write("{0}\n".format(objlist[0].header()))
             file.write("\n".join([obj.asline() for obj in objlist]))
-
+            if append:
+                file.write("\n")
 
 class FITSRecord(BaseRecord):
     """
@@ -174,7 +180,7 @@ class FITSRecord(BaseRecord):
         with pyfits.open(fname) as ptr:
             header = ptr[0].header
             tbdata, colnames = ptr[ext].data, ptr[ext].columns.names
-            if tbdata != None:
+            if not tbdata is None:
                 for r in tbdata:  objlist.append(cls(r,colnames))
         return objlist, header
 
