@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 """
-==============================================================================
-RS 2014/02/01:  Corralling Candidate Info
-------------------------------------------------------------------------------
+RS 2014/02/01:  Target Visuals Module
+
 Useful for corralling subs, making finding charts etc.
-==============================================================================
 """
 
 import os
@@ -46,6 +44,37 @@ def get_sublist(xsient_name, filter='g', only_detections=True):
             maxra__gt=xsient.ra, maxdec__gt=xsient.dec)
     print "{0} was observed in {1} pointings".format(xsient_name, len(sublist))
     return xsient, sublist
+
+
+def cutout_bounds(x, y, nx, ny, naxis1, naxis2, verbose=False):
+    """
+    Grabs the coordinate limits of a cutout
+
+    Inputs
+        x, y:  Pixel coordinates of cutout center within image
+        nx, ny:  Extent of cutout in pixels
+        naxis1, naxis2:  Size of image in pixels
+    """
+    # Default extent of cutout
+    xc0, xc1, yc0, yc1 = 0, nx, 0, ny
+    # Boundaries of cutout within image if cutout is wholly contained 
+    xm0, ym0 = int(np.round(x)) - nx/2, int(np.round(y)) - ny/2
+    xm1, ym1 = xm0 + nx, ym0 + ny
+    # Deal with edge cases involving partial overlap
+    if xm0 < 0:
+        xc0, xm0 = -xm0, 0
+    if xm1 > naxis1:
+        xc1, xm1 = xc1 - (xm1 - naxis1), naxis1
+    if ym0 < 0:
+        yc0, ym0 = -ym0, 0
+    if ym1 > naxis2:
+        yc1, ym1 = yc1 - (ym1 - naxis2), naxis2
+    # Return final array index bounds in cutout and in larger image
+    returnvals = ((xc0, xc1, yc0, yc1), (xm0, xm1, ym0, ym1))
+    if verbose:
+        print "Utils.TargetVisuals.cutout_bounds():", returnvals
+    return returnvals
+
 
 def makefinder(xsient_name):
     """Make a finding chart using matplotlib"""

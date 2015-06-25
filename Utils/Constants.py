@@ -71,6 +71,16 @@ class Imager(object):
     zpinst = { 'u': 21.6, 'v': 21.8, 'g': 24.1,
                'r': 23.9, 'i': 23.1, 'z': 22.4, }
 
+    # Night sky background levels at Siding Spring as measured by LPNHE,
+    # in magnitudes per square arcsec
+    nsb_mag = { 'u': 25.0, 'v': 22.5, 'g': 21.5,
+                'r': 20.7, 'i': 19.3, 'z': 25.0 }
+
+    # Night sky background levels at Siding Spring as measured by LPNHE,
+    # in counts per pixel per second
+    nsb_cps = dict([(k, (0.25*10**(-0.4*(nsb_mag[k] - zpinst[k]))))
+                    for (k, v) in nsb_mag.items()])
+
     # RS 2013/06/11:  Characteristics of SkyMapper more relevant to
     # scheduling calculations.
     overhead = 20                   # Observation overhead (seconds)
