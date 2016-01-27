@@ -56,9 +56,10 @@
       <h3>Information from SMT database</h3>
       <p>Select the filters you want to plot. Click data point in the figure to
 	view thumbnails and other details.
-
 	<div id="lcplot"></div>
-
+	<input type="text" id="amount" readonly style="border:0;color:#f6931f; font-weight:bold;">
+	<div id="slider-range"></div>
+	
 	<div id="lc_lc">
 	  <div id="lc_legend"></div>
 	
@@ -135,8 +136,12 @@ $(function () {
 	var datasets = {{lcjson|safe}};
 	
 	//define colors 
-	var data_colors={"v":"#0000A0","g":"#008000","r":"#CC0000","i":"#FFA500","v_lim":"#0000A0","g_lim":"#008000","r_lim":"#CC0000","i_lim":"#FFA500"};
-        var data_symbol={"v":"square","g":"triangle","r":"diamond","i":"cross","v_lim":"uparrow","g_lim":"uparrow","r_lim":"uparrow","i_lim":"uparrow"};
+	var data_colors={"v":"#0000A0","g":"#008000","r":"#CC0000","i":"#FFA500",
+                         "v_lim":"#0000A0","g_lim":"#008000","r_lim":"#CC0000","i_lim":"#FFA500",
+                         "u":"#20B2AA","u_lim":"#20B2AA","z":"#DB7093","z_lim":"#DB7093"};
+        var data_symbol={"v":"square","g":"triangle","r":"diamond","i":"cross",
+                         "v_lim":"uparrow","g_lim":"uparrow","r_lim":"uparrow","i_lim":"uparrow",
+                         "u":"circle","u_lim":"uparrow","z":"circle","z_lim":"uparrow"};
 	
 	//set color and symbol
 	$.each(datasets, function(key, val) {
@@ -203,6 +208,10 @@ $(function () {
 	function plotAccordingToChoices() {
 	    var data = [];
 	    var plot = [];
+	    var uppermags=[];
+            var lowermags=[];
+	    var ymin=0;
+	    var ymax=0;
 
 	    choiceContainer.find("input:checked").each(function () {
 		    var key = $(this).attr("name");
@@ -213,11 +222,21 @@ $(function () {
                             {firstkey=key;}
                         }
                     data.push(datasets[key]);
+		    for (var i=0 ; i< datasets[key].data.length ; i++){
+		        uppermags.push(datasets[key].data[i][1]+datasets[key].data[i][2]);
+                        lowermags.push(datasets[key].data[i][1]-datasets[key].data[i][2]);
+	            }
 		    }
 		});
 	    
 	    if (data.length > 0)
+	        ymax=Math.max.apply(Math,uppermags)+0.1;
+		ymin=Math.min.apply(Math,lowermags)-0.1;
 		plot=$.plot($("#lcplot"), data, flotoptions);
+                var axes = plot.getAxes();
+                axes.yaxis.options.max = ymax;
+                plot.setupGrid();
+                plot.draw();  
             return plot;
 	}
 	

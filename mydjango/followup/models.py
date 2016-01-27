@@ -40,6 +40,8 @@ class Transient(models.Model):
     """
     id                = models.AutoField(primary_key=True)
     name              = models.CharField(max_length=30)
+    #adopting astronomical transient naming standard
+    byname            = models.CharField(max_length=30,blank=True,null=True,unique=True)
     ra                = models.FloatField()
     dec               = models.FloatField()
     field             = models.ForeignKey(SkymapperField)

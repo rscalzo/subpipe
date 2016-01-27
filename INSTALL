@@ -28,40 +28,52 @@ explicitly, but refer to directories given by the user.
 [ ] Make a fresh svn checkout (latest tagged version)
     svn checkout https://svn.mso.anu.edu.au/svn/skymapper/Code/Tags/subpipe/v0.9.0/
 [ ] Set $SUBPIPEHOME to the root of the svn checkout
-    setenv SUBPIPEHOME v0.9.0
-[ ] Link in the external package directory:
-    ln -s $extdir $SUBPIPEHOME/ext
+    e.g. 
+    setenv SUBPIPEHOME /priv/maipenrai/skymap/skymap/subpipe
+[ ] ln -s $extdir $SUBPIPEHOME/ext
     where $extdir is the external package directory containing bin/, lib/ etc.
     (now merged with the python virtual environment directory)
-[ ] Edit a new $SUBPIPEHOME/subpipe_env_$USER.csh for special environment
-    settings in your sandbox (skip this for production install)
+    e.g. 
+    ln -s /priv/maipenrai/skymap/skymap/subpipe_virtualenv/ $SUBPIPEHOME/ext 
 [ ] source $SUBPIPEHOME/subpipe_env.csh (and/or put it in your .cshrc)
-[ ] Make WCS solution binaries:
-    cd $BRIANWCS/src; setenv EXTROOT $SUBPIPEHOME/ext; make install
-[ ] Make SkyMapper CCD preprocessing binaries:
-    cd $SUBPIPEHOME/src/preproc; make
-    cp fits64to32_cal $SUBPIPEHOME/bin
+[ ] cd $BRIANWCS/src; setenv EXTROOT $SUBPIPEHOME/ext; make install
+[ ] cd $SUBPIPEHOME/src/preproc; make
+    ln -s $SUBPIPEHOME/src/preproc/fits64to32_cal $SUBPIPEHOME/bin/fits64to32_cal
 [ ] Enable R/B classifier by copying/linking model into $SUBPIPEHOME/etc:
     ln -s $rf_file $SUBPIPEHOME/etc/randomforest.pkl
     where $rf_file is the random forest python pickle file.
     (this should be kept separately somewhere safe and backed up)
-[ ] mkdir $SUBPIPEHOME/mydjango/local
-    touch $SUBPIPEHOME/mydjango/local/__init__.py
-    ln -s $extdir/mydjango/settings_sensitive.py $SUBPIPEHOME/mydjango/local/settings_sensitive.py
-[ ] Link the Javascript jsquery and flot libraries where Django can find them:
-    cd $SUBPIPEHOME/mydjango/staticfiles/js
-    ln -s $SUBPIPEHOME/ext/lib/js/flot-0.7 flot
-    ln -s $SUBPIPEHOME/ext/lib/js/jquery-1.7.2.js jquery.js 
+    e.g.
+    ln -s /priv/maipenrai/skymap/skymap/subpipe/etc/randomforest.pkl $SUBPIPEHOME/etc/randomforest.pkl
+[ ] Skip this step if running local database.
+    To use the SN database:
+       WARNING: this will update the SN main database, so only proceed if you
+    know what you are doing!
+       mkdir $SUBPIPEHOME/mydjango/local
+       touch $SUBPIPEHOME/mydjango/local/__init__.py
+       cp $extdir/mydjango/settings_sensitive.py    $SUBPIPEHOME/mydjango/local/settings_sensitive.py
+[ ] ln -s $SUBPIPEHOME/ext/lib/js/flot-0.7 $SUBPIPEHOME/mydjango/staticfiles/js/flot
+    ln -s $SUBPIPEHOME/ext/lib/js/jquery-1.7.2.js $SUBPIPEHOME/mydjango/staticfiles/js/jquery.js 
 [ ] mkdir $SUBPIPEHOME/data
 [ ] Copy test data suite directory (containing new/, ref/ etc.) to $test_data
-[ ] ln -s $SUBPIPEHOME/data/new $test_data/new
-[ ] ln -s $SUBPIPEHOME/data/ref $test_data/ref
+    (e.g. a test_data directory in $SUBPIPEHOME/)
+[ ] ln -s $test_data/new $SUBPIPEHOME/data/new
+[ ] ln -s $test_data/ref $SUBPIPEHOME/data/ref
 [ ] Initialize sqlite3 test harness database if necessary:
     mkdir -p $SUBPIPEHOME/data/mydjango/db
     cd $SUBPIPEHOME/mydjango; python manage.py syncdb
+[ ] Convert to South for easy change of schema later
+    python manage.py convert_to_south jobstats
+    python manage.py convert_to_south followup
+[ ] Fill the skymapper field table
     cd $SUBPIPEHOME/mydjango/jobstats; init_skymapper_fields.py
 [ ] $SUBPIPEHOME/subpipe_master.py
     to run pipeline on test data set and check results.  ^C when it's done.
+[ ] Test django is working:
+    go to $SUBPIPEHOME/mydjango; python manage.py runserver 0.0.0.0:8000
+    if server running on maipenrai, use a browser to go to maipenrai.anu.edu.au:8000
+[ ] To run locally, modify subpipe_env.csh file
+    change the SUBSCRATCH to /ramdisk/$username/subpipe 
 
 This could probably be wrapped into some kind of install script, but I'll
 deal with that if we have to do this more often than once a month.

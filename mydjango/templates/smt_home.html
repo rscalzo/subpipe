@@ -29,13 +29,15 @@
 {% if last_obsnight %}
   <p>If you are a SMT team member, you can choose to:
     <ul>
+      <li>Check <a href="{% url smt_map%}">survey coverage</a></li>
+      <li>Check <a href="{% url smt_cadence%}">survey cadence</a></li>
       <li><a href="{% url trans_date last_obsnight.year last_obsnight.month last_obsnight.day %}">View
 	  transient candidates detected in the last night of observation
 	  ({{last_obsnight|date:"Y-m-d"}})</a></li>
       <!--    <li><a href="jobstats/{{last_obsnight.year}}/{{last_obsnight.month}}/{{last_obsnight.day}}/">View
 	      pipeline job stats for the last night of observation
 	      ({{last_obsnight|date:"Y-m-d"}})</a></li> -->
-      <li><a href="{% url trans_all %}">View all transient candidates detected so far </a></li>
+      <!--    <li><a href="{% url trans_all %}">View all transient candidates detected so far </a></li>-->
       <li>
 	<form action="" method="post" onSubmit=true>{% csrf_token %}
 	  Select a date to view its list of transient candidates (currently only the ones LAST detected on that night)

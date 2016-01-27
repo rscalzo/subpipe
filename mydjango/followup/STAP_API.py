@@ -15,6 +15,47 @@ import mydjango.followup.models as fu
 from django.contrib.auth.models import User
 from django.db.transaction import commit_manually, commit
 
+import string
+LC=string.ascii_lowercase
+UC=string.ascii_uppercase
+
+def next_in_seq(last):
+    #figure out next in sequence
+    #a, b, c,... aa,ab,ac...ba,bb...,aaa,aab...
+    nlc=len(LC)
+    lenname=len(last)
+    #reverse order so going from first letter
+    rev=last[::-1]
+    #start with last
+    ii=0
+    move=True
+    while ii <lenname and move:
+        #increase by one
+        nextindex=LC.index(rev[ii])+1
+        if nextindex>=nlc: 
+            nextindex=0
+        else:
+            move=False
+        rev=rev[:ii]+LC[nextindex]+rev[ii+1:]
+        ii+=1
+    if move:
+        rev=rev+LC[0]
+    return rev[::-1]
+        
+def next_dbname(year=''):
+    tag='SMT'
+    #get next unique name for transient
+    if not year:
+        #transient year
+        year=datetime.datetime.now().strftime('%y')
+    currentnames=np.array(fu.Transient.objects.filter(byname__contains=tag+year).values_list('byname',flat=True))
+    if len(currentnames)==0:
+        return tag+year+UC[0]
+    lennames=np.array(map(len,currentnames))
+    lastname=np.sort(currentnames[lennames==np.max(lennames)])[-1]
+    nextseq=next_in_seq(lastname.replace(tag+year,'').lower())
+    if len(nextseq)==1:nextseq=nextseq.upper()
+    return tag+year+nextseq
 
 def register_xsient(xdict):
     """Registers a new transient in Django.  Called by subpipe_master.py.
@@ -35,7 +76,7 @@ def register_xsient(xdict):
         newtype = fu.TransientType.objects.get_or_create(type=xdict['autotype'])[0]
         status = fu.FollowUpStatus.objects.get_or_create(status='new')[0]
         field = js.SkymapperField.objects.get(id=xdict['field'])
-        xsient = fu.Transient(name=xdict['name'],
+        xsient = fu.Transient(name=xdict['name'],byname=next_dbname(),
                               ra=xdict['ra'], dec=xdict['dec'],
                               ccd=xdict['subfield'], field=field,
                               type=newtype,
@@ -90,7 +131,7 @@ def register_xdict(xdict,smpointings,smdates):
         newtype = fu.TransientType.objects.get_or_create(type=xdict['autotype'])[0]
         status = fu.FollowUpStatus.objects.get_or_create(status='new')[0]
         field = js.SkymapperField.objects.get(id=xdict['field'])
-        xsient = fu.Transient(name=xdict['name'],
+        xsient = fu.Transient(name=xdict['name'],byname=next_dbname(),
                               ra=xdict['ra'], dec=xdict['dec'],
                               ccd=xdict['subfield'], field=field,
                               type=newtype,
@@ -125,12 +166,12 @@ def batch_create(xnew):
         newtype = fu.TransientType.objects.get_or_create(type=xdict['autotype'])[0]
         status = fu.FollowUpStatus.objects.get_or_create(status='new')[0]
         field = js.SkymapperField.objects.get(id=xdict['field'])
-        xsient = fu.Transient.objects.create(name=xdict['name'],
+        xsient = fu.Transient.objects.create(name=xdict['name'],byname=next_dbname(),
                                              ra=xdict['ra'], dec=xdict['dec'],
                                              ccd=xdict['subfield'], field=field,
                                              type=newtype,
                                              follow_up_status=status)
-    commt()
+    commit()
 
 @commit_manually
 def batch_update(xlist,xsients,smpointings,smdates):

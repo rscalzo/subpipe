@@ -105,14 +105,19 @@ def makefinder(xsient_name):
     scratchdir = CPP.scratch + "/subinspect/"
     subprocess.call(['mkdir', '-p', scratchdir])
     # Find x and y coordinates of transient in image
-    hdrfname = os.path.basename(newfn).replace(".fits.gz", ".hdr")
-    hdrfname = scratchdir + hdrfname
-    with open(hdrfname, 'w') as hdrfile:
-        hdrfile.write(str(hdr))
-    idx, idy = sky2xy(hdrfname, [xsient.ra], [xsient.dec])
+    #hdrfname = os.path.basename(newfn).replace(".fits.gz", ".hdr")
+    #hdrfname = scratchdir + hdrfname
+    #with open(hdrfname, 'w') as hdrfile:
+    #    hdrfile.write(str(hdr))
+    fname = scratchdir + os.path.basename(newfn)
+    fitsname= fname.replace(".fits.gz", ".fits")
+    os.system('cp %s %s'%(newfn,scratchdir))
+    os.system('gunzip %s'%(fname))
+    idx, idy = sky2xy(fitsname, [xsient.ra], [xsient.dec])
     idx, idy = int(idx[0]), int(idy[0])
     print "{0} appears at ({1}, {2}) in original coords".format(
         xsient.name, idx, idy)
+    os.system('rm -fr %s'%fitsname)
 
     # Reorient according to WCS
     # This incantation should get the data facing with N = up, E = left.

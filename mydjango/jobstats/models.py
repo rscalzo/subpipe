@@ -27,9 +27,29 @@ class SkymapperField(models.Model):
     id  = models.IntegerField(primary_key=True)
     ra  = models.FloatField()
     dec = models.FloatField()
-
+    ebmv = models.FloatField(default=0) #galactic extinction
+    label = models.IntegerField(default=0) #1:normal, 2:Shapley 3:Kepler etc
+    qname = models.CharField(max_length=20,default='SN Search') #string label (should replace label)
+    rank = models.IntegerField(default=0) #1:search,2:normal followup,3:target of interest followup
+    #lastobs is not really useful anymore because we need to use filter specific values
+    lastobs = models.DateTimeField(blank=True,null=True) #either from scheduler log or from sciencepointing
+    exp = models.CharField(max_length=40,default="g:45,r:45,i:30") #observation sequence,e.g. "g:45,r:45,i:30"
+    cadence = models.FloatField(default=4.0)
+    cwidth = models.FloatField(default=1.0)
+    minalt = models.FloatField(default=40.)
+    pmult = models.FloatField(default=1.0)
+    
     def __unicode__(self):
         return "{0} [{1:9.5f},{2:9.5f}]".format(self.id, self.ra, self.dec)
+    
+    def set_obsseq(self):
+        for filtinfo in self.exp.split(","):
+            filt, xpt = filtinfo.split(":")
+            filters.append(filt)
+            exptime[filt] = float(xpt)
+        self.filters = filters
+        self.exptime = exptime
+
     class Meta:
         ordering=['id']
 
@@ -43,7 +63,10 @@ class SkymapperPointing(models.Model):
     filename = models.CharField(max_length=60)
     exptime = models.FloatField(default=0.0)
     obstype = models.CharField(max_length=8)
-    status  = models.IntegerField(default=0)
+    status  = models.IntegerField(default=0) #processing status
+    # proc_status would replace status for more information on processing
+    # if image is processed more than once, latest status should be most useful
+    proc_status=models.ForeignKey('PipelineExitStatus',blank=True, null=True)
 
     def __unicode__(self):
         return "{0:.1f}-sec exposure in filter {1} at {2}".format(
@@ -61,10 +84,62 @@ class SciencePointing(SkymapperPointing):
     elong    = models.FloatField(default=99.9)
     elongwid = models.FloatField(default=1.0)
     zp       = models.FloatField(default=0.0)
+    bkgmed   = models.FloatField(default=0.0)
+    bkgsig   = models.FloatField(default=0.0)
+    #maglims can be derived from above, but having the value recorded is handy
+    maglim50 = models.FloatField(default=0.0)
+    maglim95 = models.FloatField(default=0.0)
+    program  = models.CharField(max_length=10,blank=True, null=True) #MS, SN_3PS, SN_BAD etc
+    surveyid = models.IntegerField(default=0) #survey id 
+    sequence = models.IntegerField(default=0) #user obs id
 
     def __unicode__(self):
         return "{0:.1f}-sec exposure of field {1} in filter {2} at {3}".format(
             self.exptime, self.field_id, self.filter, self.dateobs)
+
+
+class SkymapperImage(models.Model):
+    """Single CCD image, basis for most job.
+    """	
+    id	= models.AutoField(primary_key=True)
+    pointing = models.ForeignKey(SciencePointing, blank=True, null=True)
+    ccd = models.IntegerField(default=0)
+    seeing   = models.FloatField(default=99.9)
+    seewid   = models.FloatField(default=1.0)
+    elong    = models.FloatField(default=99.9)
+    elongwid = models.FloatField(default=1.0)
+    zp       = models.FloatField(default=0.0)
+    bkgmed   = models.FloatField(default=0.0)
+    bkgsig   = models.FloatField(default=0.0)
+    #maglims can be derived from above, but having the value recorded is handy
+    maglim50 = models.FloatField(default=0.0)
+    maglim95 = models.FloatField(default=0.0)
+    #exact pointing for easy searching
+    minra = models.FloatField(default=0.0)
+    maxra = models.FloatField(default=0.0)
+    mindec = models.FloatField(default=0.0)
+    maxdec = models.FloatField(default=0.0)
+    #status is used to track whether an image has been processed
+    #or rather whether it needs to be procssed
+    #because one image can be processed as ref and subtracted
+    #exactly what has happened can be tracked by jobs.
+    status   = models.IntegerField(default=0)
+    
+class SkymapperCoadd(SkymapperImage):
+    """Single CCD coadded image
+    """	
+    image = models.ManyToManyField(SkymapperImage,blank=True, null=True, related_name='+')
+    filter = models.CharField(max_length=1)
+    field = models.ForeignKey(SkymapperField)
+    filename = models.CharField(max_length=60)
+
+
+class SubtractionRef(models.Model):
+    """Reference for subtraction.
+    """
+    id	= models.AutoField(primary_key=True)
+    image = models.ForeignKey(SkymapperImage,blank=True,null=True)
+    ondisk = models.IntegerField(default=0)
 
 
 class PipelineRun(models.Model):
@@ -121,6 +196,7 @@ class PipelineJob(models.Model):
     pointing    = models.ForeignKey(SkymapperPointing)
     run         = models.ForeignKey(PipelineRun)
     exit_status = models.ForeignKey(PipelineExitStatus)
+    image       = models.ForeignKey(SkymapperImage,blank=True,null=True)
 
     def __unicode__(self):
         return self.jobname
@@ -135,7 +211,11 @@ class SubtractionJob(PipelineJob):
     to quickly sort and search on QA information relevant to subtractions.
     """
     refpointing = models.ForeignKey(SciencePointing)
+    ref   = models.ForeignKey(SubtractionRef,blank=True,null=True)
     minra = models.FloatField(default=0.0)
     maxra = models.FloatField(default=0.0)
     mindec = models.FloatField(default=0.0)
     maxdec = models.FloatField(default=0.0)
+    refconv = models.BooleanField(default=True) #convolution on template?
+    
+    

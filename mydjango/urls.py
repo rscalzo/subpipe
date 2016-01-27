@@ -15,7 +15,10 @@ urlpatterns = patterns('mydjango.views',
                        url(r'^$','smt_home',name='home'),
                        url(r'^/$','smt_home', name='home2'),
                        url(r'^external/pessto/','page_pessto',name='page_pessto'),
+                       url(r'^external/public/','smt_public',name='smt_public'),
                        #url(r'^accounts/register/$', 'smt_register',name='smt_register'),
+                       url(r'^status/map/','smt_map',name='smt_map'),
+                       url(r'^status/cadence/','smt_cadence',name='smt_cadence'),
                        )
 
 #jobstats, in .jobstats.views
@@ -26,6 +29,8 @@ urlpatterns += patterns('mydjango.jobstats.views',
                         # url(r'^jobstats/coveragemap/$'),
                         # url(r'^jobstats/cadencemap/$'),
                         # url(r'^jobstats/controlmap/$'),
+                        url(r'^status/field/(\d{+})$', 'smt_field', name='smt_field'),
+                        url(r'^status/field/lookup/$', 'smt_field_lookup', name='smt_field_lookup'),
                         )
 
 #accounts stuff

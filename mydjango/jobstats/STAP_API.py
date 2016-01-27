@@ -11,7 +11,6 @@ import numpy as np
 from Utils import Constants
 import mydjango.jobstats.models as js
 
-
 def SMfield_lookup(ra, dec):
     """Find SkyMapper field corresponding to (ra, dec) in decimal degrees."""
     
@@ -25,35 +24,131 @@ def SMfield_lookup(ra, dec):
     arcdist = np.sqrt([(ra-f.ra)**2 + (dec-f.dec)**2 for f in SMfield_list])
     return SMfield_list[arcdist.argmin()]
 
-def register_pointing(names):
+
+def register_pointing(names,update=False,addimage=False,proc_status=None):
     """Registers a pointing in Django.  Called by STAP_ingest.py.
     
     names:  A Constants.Filenames instance."""
 
     # Since the Filenames structure from Constants.py already accessed these
     # (immutable) attributes via the header, just read them from there.
-    night = js.ObsNight.objects.get_or_create(ut_date=names.dateobs.date())[0]
+    #night = js.ObsNight.objects.get_or_create(ut_date=names.dateobs.date())[0]
 
     if names.obstype == 'object': # hasattr(names, 'field'):
+        night = js.ObsNight.objects.get_or_create(ut_date=names.dateobs.date())[0]
         field = js.SkymapperField.objects.get(id=names.field)
-        pointing = js.SciencePointing.objects.get_or_create(
+        pointing,isnew = js.SciencePointing.objects.get_or_create(
                 filename=Constants.get_basename(names.basefname),
                 night=night, field=field, filter=names.filter,
                 obstype=names.obstype, dateobs=names.dateobs,
-                exptime=names.exptime)[0]
-        pointing.airmass=names.airmass
-        pointing.seeing=names.seeing
-        pointing.seewid=names.seewid
-        pointing.elong=names.elong
-        pointing.elongwid=names.elongwid
-        pointing.zp=names.zpmag
-        pointing.save()
+                exptime=names.exptime)
+        if proc_status:
+                pointing.proc_status=proc_status
+                pointing.save()
+        #find out what kind of observation it is from filename
+        #only update if new
+        if isnew or update:
+            #get program, surveyid, sequence
+            try:
+                obs_id=Constants.decode_obs_id(pointing.filename.split('_')[1])
+                pointing.program=obs_id[0]
+                pointing.surveyid=obs_id[1]
+                pointing.sequence=obs_id[2]
+            except:
+                if hasattr(names, 'program'):
+                    pointing.program=names.program
+            pointing.airmass=names.airmass
+            pointing.seeing=names.seeing
+            pointing.seewid=names.seewid
+            pointing.elong=names.elong
+            pointing.elongwid=names.elongwid
+            pointing.zp=names.zpmag
+            pointing.bkgsig=names.bkgsig
+            pointing.bkgmed=names.bkgmed
+            pointing.maglim50=names.maglim50
+            pointing.maglim95=names.maglim95
+            pointing.save()
+        if isnew:
+            #update field lastobs
+            if pointing.program=='3PS':
+                field.lastobs=field.sciencepointing_set.filter(program='3PS').order_by('-dateobs')[0].dateobs
+                field.save()
+            #also register 32 CCD images
+            if addimage:
+                ccds=range(1,33)
+                for ccd in ccds:
+                    image,isnew=js.SkymapperImage.objects.get_or_create(pointing=pointing,ccd=ccd)
+                    if isnew:
+                        image.seeing=names.seeing
+                        image.seewid=names.seewid
+                        image.elong=names.elong
+                        image.elongwid=names.elongwid
+                        image.zp=names.zpmag
+                        image.bkgmed=names.bkgmed
+                        image.bkgsig=names.bkgsig
+                        image.maglim50=names.maglim50
+                        image.maglim95=names.maglim95
+                        image.save()
+
         return pointing
     else:
+        #FY - 2015-08-20, there was an error, so at this point, don't bother with nonscience frames
+        return None
         return js.SkymapperPointing.objects.get_or_create(
                 filename=Constants.get_basename(names.basefname),
                 night=night, filter=names.filter, obstype=names.obstype,
                 dateobs=names.dateobs, exptime=names.exptime)[0]
+    
+def register_image(meta,pointing=None,update=True,isref=False,updaterefim=False,updatepointing=False,refondisk=1,refcheck=True):
+    if meta.subfield==0:
+        return None
+    if pointing is None:
+        pointing=register_pointing(meta,addimage=False)
+    if isref:
+        refim,isnew=js.SkymapperImage.objects.get_or_create(pointing=pointing,ccd=meta.subfield)
+        #image,newref=js.SubtractionRef.objects.get_or_create(pointing=pointing,ccd=meta.subfield,skymapperimage__ptr=refim)
+        image,newref=js.SubtractionRef.objects.get_or_create(image=refim)
+        if refcheck:
+            if refim.seeing > Constants.MAX_REFSEEING or refim.elong > Constants.MAX_REFELONG or refim.maglim95 < Constants.MIN_REFDEPTH[refim.pointing.filter]:
+                refim.status= Constants.FLAG_BADREF
+                refim.save()
+        if updaterefim:
+            if refim.status==0:
+                refim.status=1
+                refim.save()
+        if newref:
+            image.ondisk=refondisk
+            image.save()
+    else:
+        image,isnew=js.SkymapperImage.objects.get_or_create(pointing=pointing,ccd=meta.subfield)
+    if isnew or update:
+        image.seeing=meta.seeing
+        image.seewid=meta.seewid
+        image.elong=meta.elong
+        image.elongwid=meta.elongwid
+        image.zp=meta.zpmag
+        image.bkgmed=meta.bkgmed
+        image.bkgsig=meta.bkgsig
+        image.maglim50=meta.maglim50
+        image.maglim95=meta.maglim95
+        image.minra=meta.minra
+        image.maxra=meta.maxra
+        image.mindec=meta.mindec
+        image.maxdec=meta.maxdec       
+        image.save()
+    if updatepointing:
+        pointing.seeing=image.seeing
+        pointing.seewid=image.seewid
+        pointing.elong=image.elong
+        pointing.elongwid=image.elongwid
+        pointing.zp=image.zp
+        pointing.bkgsig=image.bkgsig
+        pointing.bkgmed=image.bkgmed
+        pointing.maglim50=image.maglim50
+        pointing.maglim95=image.maglim95
+        pointing.save()
+    return image
+
 
 def register_run(start_run_time):
     """Registers a pipeline run in Django.  Called by subpipe_master.py.
@@ -89,7 +184,8 @@ def register_job(meta, output, refmeta=None):
         totaltimes[label] = sum([stages[i][label] for i in range(len(stages))])
 
     # Find the corresponding pointing, run, and exit status if they exist.
-    pointing = register_pointing(meta)
+    pointing = register_pointing(meta,addimage=False)
+    image = register_image(meta,pointing=pointing)
     run = js.PipelineRun.objects.get(runtag=meta.runtag)
     if "exception" in stages[-1]:
         exit_status = js.PipelineExitStatus.objects.get_or_create(
@@ -103,16 +199,24 @@ def register_job(meta, output, refmeta=None):
     if refmeta is None:
         # Not a subtraction job
         job = js.PipelineJob.objects.get_or_create(
-                  jobname=output['name'], ccd=meta.ccd,
-                  start_time=stages[0]['t_start'],
-                  end_time=stages[-1]['t_finish'],
-                  usr_time=totaltimes['usr_time'],
-                  cpu_time=totaltimes['cpu_time'],
-                  walltime=totaltimes['walltime'],
-                  pointing=pointing, run=run, exit_status=exit_status)
+            jobname=output['name'], ccd=meta.subfield,
+            start_time=stages[0]['t_start'],
+            end_time=stages[-1]['t_finish'],
+            usr_time=totaltimes['usr_time'],
+            cpu_time=totaltimes['cpu_time'],
+            walltime=totaltimes['walltime'],
+            pointing=pointing, image=image,
+            run=run, exit_status=exit_status)
+        image.status=1
+        if "exception" in stages[-1]:
+            image.status+=10
+        else:
+            refimage=register_image(meta,pointing=pointing,update=True,isref=True)
+        image.save()
     else:
         # Subtraction job; add REF pointing and other fun things
-        refpointing = register_pointing(refmeta)
+        refpointing = register_pointing(refmeta,addimage=False)
+        refimage=register_image(refmeta,pointing=refpointing,update=False,isref=True)
         minra, mindec = 0.0, 0.0
         maxra, maxdec = 0.0, 0.0
         for s in stages:
@@ -124,15 +228,21 @@ def register_job(meta, output, refmeta=None):
             except:
                 continue
         job = js.SubtractionJob.objects.get_or_create(
-                  jobname=output['name'], ccd=meta.ccd,
-                  start_time=stages[0]['t_start'],
-                  end_time=stages[-1]['t_finish'],
-                  usr_time=totaltimes['usr_time'],
-                  cpu_time=totaltimes['cpu_time'],
-                  walltime=totaltimes['walltime'],
-                  pointing=pointing,
-                  refpointing=refpointing,
-                  minra=minra, mindec=mindec,
-                  maxra=maxra, maxdec=maxdec,
-                  run=run, exit_status=exit_status)
+            jobname=output['name'], ccd=meta.subfield,
+            start_time=stages[0]['t_start'],
+            end_time=stages[-1]['t_finish'],
+            usr_time=totaltimes['usr_time'],
+            cpu_time=totaltimes['cpu_time'],
+            walltime=totaltimes['walltime'],
+            pointing=pointing,
+            image=image,
+            refpointing=refpointing,
+            ref=refimage,
+            minra=minra, mindec=mindec,
+            maxra=maxra, maxdec=maxdec,
+            run=run, exit_status=exit_status)
+        image.status=2
+        if "exception" in stages[-1]:
+            image.status+=10
+        image.save()
     return job

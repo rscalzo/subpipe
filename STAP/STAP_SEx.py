@@ -46,6 +46,9 @@ def SEx(imname, seeing=5.0, do_apcor=False, do_seeing=False, rerun=False,
     # Right now this isn't being filled elsewhere (but someday it will).
     iminfo = Constants.Filenames(imname)
     ccd = iminfo.ccd
+    #get default
+    saturate=Constants.Imager.saturate_adu
+    gain=Constants.Imager.gain
 
     # RS 2011/10/20:  If the SEEING keyword exists in the image header,
     # it probably came from a previous run of SExtractor.  Use it as a more
@@ -66,6 +69,12 @@ def SEx(imname, seeing=5.0, do_apcor=False, do_seeing=False, rerun=False,
         filtname = imghdr["FILTNAME"]
         minx, maxx = 0, float(imghdr['NAXIS1'])
         miny, maxy = 0, float(imghdr['NAXIS2'])
+        #override defaults
+        if 'SATURATE' in imghdr:
+            if imghdr['SATURATE'] >0: saturate=imghdr['SATURATE']
+        if 'GAIN' in imghdr:
+            if imghdr['GAIN']>0: gain=imghdr['GAIN']
+
     
     # RS 2011/04/21:  Choose a good convolution kernel.
     if seeing > 0.0:  convfile = "gauss_1.5_3x3.conv"
@@ -91,9 +100,9 @@ def SEx(imname, seeing=5.0, do_apcor=False, do_seeing=False, rerun=False,
         # FWHM of PSF (seeing, arcsec)
         "-SEEING_FWHM {0:.2f}".format(Constants.Imager.pixel_scale*seeing),
         # Upper saturation limits for pixels
-        "-SATUR_LEVEL {0:.1f}".format(Constants.Imager.saturate_adu),
+        "-SATUR_LEVEL {0:.1f}".format(saturate),
         # Detector gain
-        "-GAIN {0:.3f}".format(Constants.Imager.gain),
+        "-GAIN {0:.3f}".format(gain),
         # Convolution kernel for extraction
         "-FILTER_NAME " + convfile,
         # Output catalog name

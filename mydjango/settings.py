@@ -1,6 +1,5 @@
 # Django settings for mydjango project.
 
-from Utils.Constants import is_production_install
 from Utils.Constants import PipelinePath as CPP
 
 
@@ -64,11 +63,12 @@ MEDIA_URL = '/media/'
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = CPP.django_static
+STATIC_ROOT = ''
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
 STATIC_URL = '/static/'
+#STATIC_URL = 'http://www.mso.anu.edu.au/~skymap/smt/dbi/static/'
 
 # URL prefix for admin static files -- CSS, JavaScript and images.
 # Make sure to use a trailing slash.
@@ -80,7 +80,8 @@ STATICFILES_DIRS = (
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
-    CPP.data + '/mydjango/static/',
+    CPP.home + "/mydjango/staticfiles",
+    CPP.data + '/mydjango/static',
 )
 
 # List of finder classes that know how to find static files in
@@ -131,12 +132,15 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    # RS 2015/05/19:  South database migration for updating models
-    'south',
     # RS:  User-defined apps
     "mydjango.jobstats",
     "mydjango.followup",
 )
+try:
+    import south
+    INSTALLED_APPS=INSTALLED_APPS+("south",)
+except:
+    pass
 
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
@@ -175,9 +179,11 @@ TEMPLATE_CONTEXT_PROCESSORS = (
 
 WSGI_APPLICATION = "mydjango.wsgi.application"
 
+
 try:
-    if is_production_install:
-        from local.settings_sensitive import *
-        from settings_production import *
+    from local.settings_sensitive import *
+    from settings_production import *
 except ImportError:
     pass
+
+

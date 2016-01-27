@@ -253,9 +253,12 @@ class PGRecord(BaseRecord):
 
     def _init_from_sqlrow(self, **kwargs):
         for f in self._sql_fields:
-            if kwargs.has_key(f[1]):  setattr(self,f[0],kwargs[f[1]])
-            elif hasattr(self,f[0]):  pass
-            else:                     setattr(self,f[0],f[2])
+            if kwargs.has_key(f[1]):
+                setattr(self,f[0],kwargs[f[1]])
+            elif hasattr(self,f[0]):
+                pass
+            else:
+                setattr(self,f[0],f[2])
 
     def __init__(self, **kwargs):
         self._init_from_sqlrow(**kwargs)
@@ -268,7 +271,8 @@ class PGRecord(BaseRecord):
         if 'verbose' in kwargs and kwargs['verbose']:
             print cursor.mogrify(cls._sqlquery, args)
         cursor.execute(cls._sqlquery, args)
-        results = [cls(**(dict(row))) for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        results = [cls(**(dict(row))) for row in rows]
         # Clean up
         cursor.close()
         conn.close()

@@ -24,6 +24,7 @@ import re
 import mydjango.jobstats.models as js
 import mydjango.followup.models as fu
 
+from django.db.models import Min, Max
 import ephem
 
 #views for transient pages
@@ -40,6 +41,7 @@ class trans_table():
     def __init__(self,request,transients):
         list_headers=(
             ('Name','name'),
+            ('Type','type'),
             ('RA','ra'),
             ('DEC','dec'),
             ('First Detect','first_detected'),
@@ -48,22 +50,24 @@ class trans_table():
             ('# of Detections','n_det'),
             ('Field','field'),
             ('CCD','ccd'),
-            ('Type','type'),
             ('Followup Status','follow_up_status')
             )
-        sort_headers=SortHeaders(request,list_headers,default_order_field=6,default_order_type='desc')
+        sort_headers=SortHeaders(request,list_headers,default_order_field=7,default_order_type='desc')
         
         transients=transients.order_by(sort_headers.get_order_by())
         n_trans=transients.count()
         
         rows=[{'html':'','data':['<a href=\'%s\'>%s</a>'%(reverse('trans_info',args=(trans.name,)),trans.name),
-                                 trans.ra,trans.dec,
+                                 trans.type.type,trans.ra,trans.dec,
+                                 #trans.first_detected,
+                                 #trans.last_detected,
+                                 #trans.last_observed,
                                  trans.pointing_det.order_by('dateobs')[0].night,
                                  trans.pointing_det.order_by('-dateobs')[0].night,
                                  trans.pointing_obs.order_by('-dateobs')[0].night,
                                  trans.n_det,
                                  trans.field.id,trans.ccd,
-                                 trans.type.type,trans.follow_up_status]}
+                                 trans.follow_up_status]}
               for trans in transients]
         
         for index,trans in enumerate(transients):
@@ -81,12 +85,13 @@ class trans_table():
 def transients_all(request):
     template='smt_trans_all.html'
     #display all smt transients
-    transients=fu.Transient.objects.all()
-    n_trans=transients.count()
-    n_typed=transients.exclude(type__type=u'?').count()
-
+    transients=fu.Transient.objects.all().select_related('pointing_det','pointing_obs','field','type')#.annotate(first_detected=Min('pointing_det__dateobs')).annotate(last_detected=Max('pointing_det__dateobs')).annotate(last_observed=Max('pointing_obs__dateobs'))
+    n_trans=len(transients)
+    typed=[trans for trans in transients if trans.type.type!=u'?']
+    n_typed=len(typed)
+    
     stats={'n_trans':n_trans,'n_typed':n_typed}
-
+    
     trans_tb=trans_table(request,transients)
     return render_to_response(template,{'stats':stats,'headers':trans_tb.headers,'rows':trans_tb.rows},context_instance=RequestContext(request))
 
@@ -103,24 +108,31 @@ def transients_date(request,year,month,day):
     
 
     #get some stats for that obsnight
-    pointings=js.SciencePointing.objects.filter(night=obsnight)
+    pointings=js.SciencePointing.objects.filter(night=obsnight,program='3PS')
     n_pointings=pointings.count()
     n_fields=pointings.values('field').distinct().count()
     
     n_jobs=0
     n_goodjobs=0
+    n_refjobs=0
+    n_goodrefjobs=0
     for pointing in pointings:
         jobs=js.PipelineJob.objects.filter(jobname__contains='sub',pointing=pointing).select_related('exit_status')
         n_jobs=n_jobs+jobs.count()
         n_goodjobs=n_goodjobs+jobs.filter(exit_status__description='Success').count()
+        refjobs=js.PipelineJob.objects.filter(jobname__contains='ref',pointing=pointing).select_related('exit_status')
+        n_refjobs=n_refjobs+refjobs.count()
+        n_goodrefjobs=n_goodrefjobs+refjobs.filter(exit_status__description='Success').count()
         
     #OK, now all the transients detected on that day
-    transients=fu.Transient.objects.filter(pointing_det__night=obsnight).distinct().select_related()
-    n_trans=transients.count()
-    n_typed=transients.exclude(type__type=u'?').count()
-
+    transients=fu.Transient.objects.filter(pointing_det__night=obsnight).distinct().select_related('pointing_det','pointing_obs','field','type')#.annotate(first_detected=Min('pointing_det__dateobs')).annotate(last_detected=Max('pointing_det__dateobs')).annotate(last_observed=Max('pointing_obs__dateobs'))
+    n_trans=len(transients)
+    typed=[trans for trans in transients if trans.type.type!=u'?']
+    n_typed=len(typed)
+    
     stats={'n_pointings':n_pointings,'n_fields':n_fields,
            'n_jobs':n_jobs,'n_goodjobs':n_goodjobs,
+           'n_refjobs':n_refjobs,'n_goodrefjobs':n_goodrefjobs,
            'n_trans':n_trans,'n_typed':n_typed}
     
     trans_tb=trans_table(request,transients)
@@ -143,7 +155,8 @@ def transient_info(request,trans_name):
     except ObjectDoesNotExist:
         raise Http404
     
-    
+    old_type=trans.type.type
+
     try:
         ptrans=fu.Transient.objects.filter(id__lt=trans.id).reverse()[0]
         prevtrans=ptrans.name
@@ -210,27 +223,67 @@ def transient_info(request,trans_name):
         trans_type=fu.TransientType.objects.get_or_create(type=user_type)[0]
         trans.type=trans_type
         trans.savelog(user=request.user,comment=user_comment)
-
+        # FY 2015/08: update the XREF file
+        #xreffile=xsientnames.absxrefname
+        #hdulist=pyfits.open(xreffile,mode='update')
+        #for (key, value) in hdulist[0].header.items():
+        #    if value==trans.name:
+        #        namematch = re.match("NAME(\d{4})", key)
+        #        id=int(namematch.group(1))
+        #        hdulist[0].header.update("TYPE{0:04d}".format(id),
+        #                                 str(trans.type.type),
+        #                                 "Type of source with index {0}".format(id))
+        #hdulist.close()
+        
         # RS 2014/01/31:  In another awful hack, add to the end of the
         # "followup" file in etc if it's a new Cand or similar.
+        # FY 2015/08: use database to track followup
         if user_type in follow_types:
-            schedfname = CPP.etc + "/skymapper_followup.txt"
-            # first see whether we've already got this field
-            add = True
-            with open(schedfname, 'r') as schedfile:
-                add = np.all([line.strip().split()[0] != str(trans.field.id)
-                              for line in schedfile])
-            if add:
-                with open(schedfname, 'a') as schedfile:
-                    today = datetime.datetime.now().strftime("%Y/%m/%d")
-                    schedfile.write("# {0}:  {1}\n".format(today, trans.name))
-                    schedfile.write("{0:<4}  {1:>11}  {2:>11}  {3:.3f} {4:<20}\n"
-                        .format(trans.field.id,
-                                str(ephem.hours(trans.field.ra*ephem.pi/180)),
-                                str(ephem.degrees(trans.field.dec*ephem.pi/180)),
-                                0.0, "v:60,g:30,r:30,i:30"))
+            sf=js.SkymapperField.objects.get(id=trans.field.id)
+            if sf.rank==1:
+                if sf.label<4:
+                    sf.cadence=2.
+                    sf.cwidth=sf.cadence*0.1
+                    sf.pmult=2.
+                    sf.minalt=28.
+                    sf.exp='v:120,g:75,r:75,i:60'
+                    sf.rank=2
+                    sf.save()
+                else:
+                    sf.cadence=3.
+                    sf.cwidth=sf.cadence*0.1
+                    sf.pmult=2.
+                    sf.minalt=28.
+                    sf.exp='v:100,g:100,r:100,i:100'
+                    sf.rank=2
+                    sf.save()
             # also generate a finding chart for the transient
             # makefinder(trans.name)
+        #FY 2015/08: de-followup
+        if old_type in follow_types and (not user_type in follow_types):
+            sf=js.SkymapperField.objects.get(id=trans.field.id)
+            othertypes=list(set(sf.transient_set.all().values_list('type__type',flat=True)))
+            goodf=False
+            for otype in othertypes:
+                if otype in follow_types:
+                    goodf=True
+            if not goodf and sf.rank>1:
+                if sf.label<4:
+                    sf.cadence=4.
+                    sf.cwidth=1.
+                    sf.pmult=1.
+                    sf.minalt=40.
+                    sf.exp='g:45,r:45,i:30'
+                    sf.rank=1
+                    sf.save()
+                else:
+                    sf.cadence=4.
+                    sf.cwidth=1.
+                    sf.pmult=1.
+                    sf.minalt=40.
+                    sf.exp='g:100,r:100'
+                    sf.rank=1
+                    sf.save()
 
     #changelogs                                                                                                                
     changes=fu.Transient_Change.objects.filter(transient=trans)
@@ -266,7 +319,8 @@ def map_lctable_to_dict(lctable,dict_keys,islimit=False,objname=''):
         for dict_key in dict_keys:
               lc_json_val[dict_key.lower()]=[]
         lc_json_dict[lc_json_key]=lc_json_val
-
+    
+    hasobsid='OBSID' in lctable.dtype.names
     for lcrow in lctable:
         filter=lcrow['FILTER']
         if islimit: filter=filter+'_lim'
@@ -276,9 +330,14 @@ def map_lctable_to_dict(lctable,dict_keys,islimit=False,objname=''):
         if lcrow['MAG_CAL_ERR'] < 0. or lcrow['MAG_CAL_ERR'] > 10. or islimit:
             mag_err=0.
         lc_json_dict[filter]['data'].append([mjd,mag,mag_err])
-        subid=FilenamesSub.subid_from_fields(
-            runtag=lcrow['RUNTAG'],field=int(lcrow['SM_FIELD']),filter=lcrow['FILTER'],
-            obsseq=lcrow['OBSSEQ'], subfield=int(lcrow['SUBFIELD']))
+        if hasobsid:
+            subid=FilenamesSub.subid_from_fields(
+                runtag=lcrow['RUNTAG'],field=int(lcrow['SM_FIELD']),filter=lcrow['FILTER'],
+                obsid=lcrow['OBSID'],obsseq=lcrow['OBSSEQ'], subfield=int(lcrow['SUBFIELD']))
+        else:
+            subid=FilenamesSub.subid_from_fields(
+                runtag=lcrow['RUNTAG'],field=int(lcrow['SM_FIELD']),filter=lcrow['FILTER'],
+                obsseq=lcrow['OBSSEQ'], subfield=int(lcrow['SUBFIELD']))
         thumbs=ThumbNames(objname,subid)
         for dict_key in dict_keys:
             if dict_key in 'DATE_OBS':

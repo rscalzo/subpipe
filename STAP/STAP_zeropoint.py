@@ -7,17 +7,17 @@ import argparse
 import numpy as np
 from STAP_comm import print_cmd_line
 from Utils.TrackableException import TrackableException as STAP_Error
-from Utils.Catalog import APASSObject, SExtractorDetection, SkymapperCalibStar
+from Utils.Catalog import APASSObject, APASSSMObject, SExtractorDetection, SkymapperCalibStar
 from Utils.Catalog import match_coords, CatalogEntry
 from Utils.Photometry import calc_zp, make_SM_cal, merge_cal
 from Utils.Photometry import calc_fluxlim, calc_fluxlim_img
+from Utils.Constants import PipelinePath as CPP
 
-
-def zeropoint(starsfname, calstarsfname="calstars.fits", imgfname=None):
+def zeropoint(starsfname, calstarsfname="calstars.fits", imgfname=None,redo=False,verbose=True):
     """Applies a calibration to zeropoint an array of SExtractorDetections"""
 
     print_cmd_line("STAP_zeropoint.py", starsfname,
-                   calstarsfname=calstarsfname, imgfname=imgfname)
+                   calstarsfname=calstarsfname, imgfname=imgfname,redo=redo)
 
     # Read the objects in; use the file extension to guess what they are.
     # (Find a better way of doing this in the future.)
@@ -34,14 +34,6 @@ def zeropoint(starsfname, calstarsfname="calstars.fits", imgfname=None):
     print "Fraction of PSF flux in 4-pixel aperture = {:.3f}".format(
         1.0 - np.exp(-0.5*(4.0/seeing)**2))
 
-    # Get ready to match stars to the catalog
-    ralist, declist = [s.ra for s in stars], [s.dec for s in stars]
-    ra_min, dec_min = np.min(ralist), np.min(declist)
-    ra_max, dec_max = np.max(ralist), np.max(declist)
-    ra_mid, dec_mid = (ra_max + ra_min)/2, (dec_max + dec_min)/2
-    cD = np.cos(np.pi*0.5*(dec_max - dec_min)/180.0)
-    R = np.max([cD*(ra_max - ra_min)/2, (dec_max - dec_min)/2])
-
     # option 1:  Pre-existing SkyMapper frame zeropointed to APASS DR6
     if os.path.exists(calstarsfname):
         print "Reading FITS file", calstarsfname
@@ -49,22 +41,50 @@ def zeropoint(starsfname, calstarsfname="calstars.fits", imgfname=None):
         print "Read {0} stars from {1}".format(len(calstars), calstarsfname)
         if calsrc_kw in hdr and caltyp_kw in hdr:
             calsrc, caltyp = hdr[calsrc_kw], hdr[caltyp_kw]
-            zp, zp_err = calc_zp(stars, calstars, filter, verbose=True)
+            zp, zp_err = calc_zp(stars, calstars, filter, verbose=verbose,use_colors=False)
     # option 2:  APASS DR6 (best external catalog we have right now)
-    if calsrc is None or zp_err > 1.0:
-        print "Querying APASS DR6 for calibration stars..."
-        calsrc, caltyp = "APASS DR6", "EXTERNAL"
-        catstars = APASSObject.pgquery(ra_mid, dec_mid, R, verbose=True)
+    if calsrc is None or zp_err > 1.0 or redo:
+        # Figuring out the area to search the catalog
+        ralist, declist = [s.ra for s in stars], [s.dec for s in stars]
+        # FY - ra wraps around 360 degrees, so dec first
+        dec_min,dec_max = np.min(declist), np.max(declist)
+        dec_mid = (dec_max + dec_min)/2
+        # be generous, use lower absolute dec boundary, upper cD
+        cD = np.cos(np.pi*min(map(abs,[dec_min,dec_max]))/180.0)
+        # now ra
+        ra_min, ra_max = np.min(ralist), np.max(ralist)
+        if ra_max - ra_min>180.: #unless the field is close to -90
+            ralist.sort()
+            ragap=[ralist[ira+1]-ra for ira,ra in enumerate(ralist[:-1])]
+            ra_max=np.max(ralist[:np.argmax(ragap)+1])+360.
+            ra_min=np.min(ralist[np.argmax(ragap)+1:])
+            ra_mid = (ra_max + ra_min)/2
+            if ra_mid>360: ra_mid-=360.
+        else:
+            ra_mid = (ra_max + ra_min)/2
+        R = np.max([cD*(ra_max - ra_min)/2, (dec_max - dec_min)/2])
+        # increase the size a bit to accomedate dithering
+        R *= 1.1
+        print "Querying APASS DR7 for calibration stars..."
+        calsrc, caltyp = "APASS DR7 SM DR1", "EXTERNAL"
+        catstars = APASSSMObject.pgquery(ra_mid, dec_mid, R, verbose=verbose,dust_map_path=CPP.etc)
         print "{0} stars retrieved from APASS".format(len(catstars))
-        zp, zp_err = calc_zp(stars, catstars, filter, verbose=True)
+        zp, zp_err = calc_zp(stars, catstars, filter, verbose=verbose,use_colors=False)
         xcalstars = make_SM_cal(stars, filter, zp=zp)
+        #try APASS, without DR1 transformation
+        if zp_err >1.0:
+            calsrc, caltyp = "APASS DR7", "EXTERNAL"
+            catstars = APASSObject.pgquery(ra_mid, dec_mid, R, verbose=verbose,dust_map_path=CPP.etc)
+            print "{0} stars retrieved from APASS".format(len(catstars))
+            zp, zp_err = calc_zp(stars, catstars, filter, verbose=verbose)
+            xcalstars = make_SM_cal(stars, filter, zp=zp)
     # option 3:  "auto-calibrate" on SkyMapper data (differential LCs only)
     if zp_err > 1.0:
         print "No good calibration available for this filter; auto-filling"
         calsrc, caltyp = starsfname, "INTERNAL"
         xcalstars = make_SM_cal(stars, filter, exptime=exptime)
         print len(xcalstars), "auto-calibrated sources filled in"
-        zp, zp_err = calc_zp(stars, xcalstars, filter, verbose=True)
+        zp, zp_err = calc_zp(stars, xcalstars, filter, verbose=verbose,use_colors=False)
 
     # If we've got something good enough, write it to disk.
     if zp_err < 1.0:

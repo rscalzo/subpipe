@@ -144,6 +144,7 @@ def STAP_make_thumbs_xy(imname,xs,ys,box=120,outdir=None,usesubid=None,objnames=
         pyplot.axvline(x=xrel,ymin=vline[2],ymax=vline[3],c='1')
         
         pyplot.savefig(stampname)
+        pyplot.close()
 
 def STAP_make_thumbs(imname,ras,decs,box=1.,pbox=None,outdir=None,usesubid=None,objnames=None,suffix=''):
     if len(ras) != len(decs):

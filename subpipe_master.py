@@ -28,6 +28,7 @@ from Utils.ProfilerStopwatch import ProfilerStopwatch
 from mydjango.jobstats.STAP_API import register_job, register_run
 from mydjango.followup.STAP_API import register_xlist
 import mydjango.followup.models as fu
+import mydjango.jobstats.models as js
 
 # RS 2012/05/25:  this version not integrated w/Django yet
 # def register_job(*args):  pass
@@ -88,7 +89,7 @@ def main():
     print "ngstr =", ngstr
 
     # Set up the queue for pipeline processes
-    Q = Pipeline.LowMemQueue(name="Main Pipeline Queue", processors=32)
+    Q = Pipeline.LowMemQueue(name="Main Pipeline Queue", processors=args.nproc)
     pwatch = ProfilerStopwatch()
 
     start_run_time = time.time()        # start time for run, use as run ID
@@ -124,6 +125,9 @@ def main():
         # This assumes there's another process to download mosaic images
         # from markle, split and overscan-subtract them.
         CPP_base_glob = Constants.PipelinePath.new + "/*/*/*/*"
+        #CPP_base_glob = Constants.PipelinePath.new + "/*/*/*/*_089*"
+        #CPP_base_glob2= Constants.PipelinePath.new + "/*/*/*/*_169*"
+        ngstr=['2015-08-01T[12]*','2015-08-02T*','2015-08-03T0*']
         freshfnames = [f for f in
                        # glob.glob(Constants.PipelinePath.new_glob_str)
                        glob.glob(CPP_base_glob + ngstr[0] + "*.fits") +
@@ -147,8 +151,9 @@ def main():
             print "memory use {0:.1f} MB ({1:.1f}%)".format(memtot, pmemtot)
             sys.stdout.flush()
         idle = (len(fieldccdlock) == 0 and len(freshfnames) == 0)
-        if idle and (not args.waitfornew or
-                     ephem.now().datetime().strftime("%Y-%m-%d") != today_str):
+#        if idle and (not args.waitfornew or
+#                     ephem.now().datetime().strftime("%Y-%m-%d") != today_str):
+        if idle and (not args.waitfornew):
             print "subpipe_master.py:  ran out of stuff to do"
             print "Exiting normally at", time.asctime(time.localtime(start_loop_time))
             return
@@ -169,20 +174,31 @@ def main():
             # If there's no room left, don't submit any more
             if len(fieldccdlock) >= Q.N_processors:  break
 
+            # RS 2015/06/24:  Field 0000 is actually code for a failed WCS
+            # solution, so don't even bother submitting these.
+            if int(new.field) == 0:
+                print "Skipping", new.basefname,
+                print "because there's a problem with the WCS"
+                donefnames.append(new.absfname)
+                continue
+
             # RS 2012/02/23:  Don't process the same field+CCD combination
             # at the same time, it'll screw up candidate cross-referencing.
             fieldccdtag = locktag(new)
             if fieldccdtag in fieldccdlock:  continue
 
             # RS 2013/10/30:  Basic quality control
-            if new.seeing == None or new.seeing > 10.0 or new.elong > 1.2:
+            if new.seeing == None or new.elong > 1.2: # or new.seeing < 10.0
                 print "Skipping", new.basefname,
                 donefnames.append(new.absfname)
                 if new.seeing == None:
                     print "because seeing not known"
-                elif new.seeing > 10.0:
-                    print "because seeing is terrible",
-                    print "({0} > 10.0)".format(new.seeing)
+                # RS 2015/04/28:  Removing this restriction for now because
+                # in bad seeing mode we're liable to get a lot of terrible
+                # images.  Keeping elongation cut though.
+                # elif new.seeing > 10.0:
+                #     print "because seeing is terrible",
+                #     print "({0} > 10.0)".format(new.seeing)
                 elif new.elong > 1.2:
                     print "because elongation is terrible",
                     print "({0} > 1.2)".format(new.elong)
@@ -225,7 +241,8 @@ def main():
             # in a previous run, skip it.  Also, find a more elegant way to
             # do this later.
             workflow._setup_workflow(*(Qargs[1:]))
-            if all([os.path.exists(fn) for fn in workflow._copy_back]):
+            if all([os.path.exists(fn) for fn in workflow._copy_back if
+                    '.fits.stars' in fn]):
                 print "Skipping {0}, we already ran it".format(workflow.name)
                 donefnames.append(new.absfname)
                 continue
@@ -361,9 +378,13 @@ def pick_ref(new, xprelist=None, verbose=False):
             latest_allowed = ephem.Date(ephem.Date(new.dateobs) - 14.0)
         # Now we go.
         for fn in files:
-            hdr = pyfits.getheader(fn)
-            # Status debugging statements
             if verbose:  print "{0}: ".format(fn),
+            try:
+                hdr = pyfits.getheader(fn)
+            except IOError:
+                print "-- rejected (trapped IOError / file unreadable)"
+                continue
+            # Status debugging statements
             kwhash = { 'DATE-OBS': 'None', 'SEEING': 'None', 'ZPMAG': 'None' }
             # Don't pick an image as REF with no DATE-OBS, SEEING or ZPMAG
             complete = True
@@ -475,7 +496,7 @@ def cache_pointing_info(meta):
         os.path.dirname(meta.skybot_cachefname)), shell=True)
     roids = SkybotObject.webquery(ra=smfield.ra, dec=smfield.dec,
                                   datetime=dtobs, rm=120,
-                                  cachefname=meta.skybot_cachefname)
+                                  cachefname=meta.skybot_cachefname,verbose=True)
     end_cache_time = time.time()
     print "Time for SkyBot to run:  {0:.1f} sec".format(
             end_cache_time - start_cache_time)
