@@ -14,25 +14,21 @@ import os
 import time
 import datetime
 import subprocess
-try:
-    import ephem
-    import pyfits
-    import numpy as np
-    import copy
-    from Utils.Record import AsciiRecord
-    from Utils.Catalog import CatalogEntry
-    from Utils.TrackableException import TrackableException
-except:
-    class CatalogEntry(object):pass
-    from Utils.Record import AsciiRecord
-    from Utils.TrackableException import TrackableException
-    import numpy as np
+import ephem
+import pyfits
+import numpy as np
+import copy
+from Utils.Record import AsciiRecord
+from Utils.Catalog import CatalogEntry
+from Utils.TrackableException import TrackableException
 
 def svn_version():
     cmd = "svnversion -n " + os.environ['SUBPIPEHOME']
     proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
     return proc.communicate()[0]
 
+# Is this a production install?
+is_production_install = bool(int(os.environ["SUBPIPE_PRODUCTION_INSTALL"]))
 
 # ----------------------------------------------------------------------------
 #          Imager constants like gain, well depth, pixel scale etc.

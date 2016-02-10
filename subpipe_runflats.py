@@ -46,7 +46,7 @@ def main_runflats(date):
     subprocess.call("cp -r {0} {1}".format(etc,scratchetc), shell=True)
 
     # Set up the queue for pipeline processes
-    Q = Pipeline.Queue(name="FLATS Queue", processors=12)
+    Q = Pipeline.Queue(name="FLATS Queue", processors=8)
 
     start_run_time = time.time()        # start time for run, use as run ID
     os.chdir(scratch)                   # scratch should be our working path
@@ -77,7 +77,6 @@ def main_runflats(date):
 
     badid=[]
     for jobid in imglist:
-        print imglist[jobid]
         if len(imglist[jobid])<5:
             print "Less than 5 images found for jobid",jobid
             badid.append(jobid)

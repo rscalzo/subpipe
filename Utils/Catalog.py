@@ -18,7 +18,6 @@ import pyfits
 import numpy as np
 import datetime
 from Utils.Record import AsciiRecord, KeywordRecord, FITSRecord, PGRecord, BadInit
-from Utils.get_schlegel_ebmv import calc_ebmv
 
 
 class CatalogEntry(object):

@@ -8,6 +8,7 @@ from Utils import Constants
 from Utils.Catalog import SExtractorDetection
 from Utils.TrackableException import TrackableException as STAP_Error
 from Utils.TrackableException import ExternalFailure
+from Utils.ProfilerStopwatch import ProfilerStopwatch as Timer
 from STAP_comm import STAP_callexternal, print_cmd_line
 
 def hotpants(newname, refname, subname, sexstamps=False, timeout=None):
@@ -33,6 +34,8 @@ def hotpants(newname, refname, subname, sexstamps=False, timeout=None):
 
     # RS 2011/04/21:  List of switches to hotpants.  They are legion.
     # In general, switches "-t*" refer to the REF and "-i*" to the NEW.
+    # RS 2015/05/25:  Switches marked "++" slow down hotpants significantly.
+    # Fortunately they don't seem to be mission-critical.
     
     #set some default values
     newsat=refsat=Constants.Imager.saturate_adu
@@ -81,22 +84,22 @@ def hotpants(newname, refname, subname, sexstamps=False, timeout=None):
         "-tr {0:.1f}".format(refread),
         "-ir {0:.1f}".format(newread),
         # Outer limit half-width of kernel in pixels
-        "-r {0:d}".format(Constants.Imager.rpsf),
+        # "-r {0:d}".format(Constants.Imager.rpsf),
         # Output kernel file (we're saving these)
         "-savexy " + kernel_reg_fname,
         # Normalize to NEW image
         "-n i",
         # Use histogram convolution merit, not sigma or variance
-        #"-fom h",
+        "-fom h",
         # Polynomial order of spatial variation of kernel
         "-ko 2",
         # Polynomial order of spatial variation of sky background
         "-bgo 2",
         # Force convolution on template
-        #"-c t",
-        # Use as many stamps to minimize gap
-        "-nsx 40",
-        "-nsy 80",
+        "-c t",
+        # ++ Use as many stamps to minimize gap
+        # "-nsx 40",
+        # "-nsy 80",
         # Lower threshold for substamps
         "-ft 10",
     ]
@@ -170,8 +173,10 @@ def main():
     parser.add_argument('--sexstamps',action='store_true',default=False,
                         help='sextract substamps, True/False?')
     args = parser.parse_args()
-    hotpants(args.newname, args.refname, args.subname,
-             sexstamps=args.sexstamps, timeout=args.timeout)
+    mytimer = Timer()
+    mytimer.profile_call(hotpants, args.newname, args.refname, args.subname,
+                         sexstamps=args.sexstamps, timeout=args.timeout)
+    mytimer.report()
 
 if __name__ == "__main__":
     main()

@@ -49,7 +49,7 @@ class ProfilerStopwatch(object):
         maxlen = max([len(tag) for tag in self._chunks])
         print "Time used so far:"
         for key in sorted(total.keys(), key=lambda k: -total[k]):
-            print "    {:10.3f} sec  ".format(total[key]),
+            print "    {:.3f} sec  ".format(total[key]),
             if key[:10] == "call(s) to":
                 print "{:d}".format(len(self._chunks[key])),
             print key

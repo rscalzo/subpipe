@@ -15,6 +15,7 @@ from Utils.RealBogus import RealBogus
 from Utils.Catalog import SExtractorDetection as SExDet, match_coords
 from Utils.DetectionMerger import DetectionMerger
 from Utils.TrackableException import TrackableException as STAP_Error
+from LocalSettings.Skymapper.Skymapper import load_rbf_v084 as load_classifier
 from STAP_comm import print_cmd_line
 from STAP.STAP_tools.headerprop import headerprop
 
@@ -42,13 +43,7 @@ def classify_randomforest(newname, refname, subname,
     
     # Pickled machine learning classifier; currently we're using milk
     # RS 2015/03/14:  Update -- use floating point random forest classifier
-    pklfname = "{0}/{1}".format(os.environ["SUBETCPATH"],
-                                #FY - should not have version here,use what's
-                                #copied over to scratch
-                                "randomforest.pkl")
-                                #"forestpickles/randomforest_v0.8.4a.pkl")
-    with open(pklfname,"rb") as pklfile:
-        rbmodel = pickle.load(pklfile)
+    rbclass = load_classifier()
 
     # RS 2014/02/19:  Before ANYTHING else is done, propagate the runtag and
     # field ID into the subtraction's SExtractor output FITS header.  We'll
@@ -231,15 +226,9 @@ def classify_randomforest(newname, refname, subname,
         if cand.newsrc: cand.Rfnew = cand.f4sub/cand.f4new
         else:           cand.Rfnew = cand.f4sub/newflim
     
-        # Now run the classifier, yay! -- the following is milk syntax
-        # wait... don't do this if we're generating a new set to scan
-        # RS 2015/03/14:  With version 0.8.2, we're using floating point
-        # values, but the sense of the score is reversed.  Swap back using:
-        #    cand.rbscore = 100.0*(1.0 - rbmodel.apply(cand.milk_features()))
-        # RS 2015/04/16:  With version 0.8.4a, we've trained the forest
-        # to accept floating point values with the proper sign.
+        # Now run the classifier, yay!
         if not noapply:
-            cand.rbscore = 100.0*rbmodel.apply(cand.milk_features())
+            cand.rbscore = rbclass.score(cand)
     
         # Add it to the end!
         candlist.append(cand)

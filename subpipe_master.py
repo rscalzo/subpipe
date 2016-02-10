@@ -129,10 +129,10 @@ def main():
         #CPP_base_glob2= Constants.PipelinePath.new + "/*/*/*/*_169*"
         ngstr=['2015-08-01T[12]*','2015-08-02T*','2015-08-03T0*']
         freshfnames = [f for f in
-                       # glob.glob(Constants.PipelinePath.new_glob_str)
-                       glob.glob(CPP_base_glob + ngstr[0] + "*.fits") +
-                       glob.glob(CPP_base_glob + ngstr[1] + "*.fits") +
-                       glob.glob(CPP_base_glob + ngstr[2] + "*.fits")
+                       glob.glob(Constants.PipelinePath.new_glob_str)
+                       #glob.glob(CPP_base_glob + ngstr[0] + "*.fits") +
+                       #glob.glob(CPP_base_glob + ngstr[1] + "*.fits") +
+                       #glob.glob(CPP_base_glob + ngstr[2] + "*.fits")
                        if f not in donefnames]
         """
         freshfnames = [f for f in freshfnames if f not in donefnames]
@@ -151,9 +151,8 @@ def main():
             print "memory use {0:.1f} MB ({1:.1f}%)".format(memtot, pmemtot)
             sys.stdout.flush()
         idle = (len(fieldccdlock) == 0 and len(freshfnames) == 0)
-#        if idle and (not args.waitfornew or
-#                     ephem.now().datetime().strftime("%Y-%m-%d") != today_str):
-        if idle and (not args.waitfornew):
+        if idle and (not args.waitfornew or
+                     ephem.now().datetime().strftime("%Y-%m-%d") != today_str):
             print "subpipe_master.py:  ran out of stuff to do"
             print "Exiting normally at", time.asctime(time.localtime(start_loop_time))
             return
@@ -188,11 +187,14 @@ def main():
             if fieldccdtag in fieldccdlock:  continue
 
             # RS 2013/10/30:  Basic quality control
-            if new.seeing == None or new.elong > 1.2: # or new.seeing < 10.0
+            if new.seeing == None or new.seeing > 10.0 or new.elong > 1.2:
                 print "Skipping", new.basefname,
                 donefnames.append(new.absfname)
                 if new.seeing == None:
                     print "because seeing not known"
+                elif new.seeing > 10.0:
+                    print "because seeing is terrible",
+                    print "({0} > 10.0)".format(new.seeing)
                 # RS 2015/04/28:  Removing this restriction for now because
                 # in bad seeing mode we're liable to get a lot of terrible
                 # images.  Keeping elongation cut though.
@@ -241,8 +243,7 @@ def main():
             # in a previous run, skip it.  Also, find a more elegant way to
             # do this later.
             workflow._setup_workflow(*(Qargs[1:]))
-            if all([os.path.exists(fn) for fn in workflow._copy_back if
-                    '.fits.stars' in fn]):
+            if all([os.path.exists(fn) for fn in workflow._copy_back]):
                 print "Skipping {0}, we already ran it".format(workflow.name)
                 donefnames.append(new.absfname)
                 continue
@@ -496,7 +497,7 @@ def cache_pointing_info(meta):
         os.path.dirname(meta.skybot_cachefname)), shell=True)
     roids = SkybotObject.webquery(ra=smfield.ra, dec=smfield.dec,
                                   datetime=dtobs, rm=120,
-                                  cachefname=meta.skybot_cachefname,verbose=True)
+                                  cachefname=meta.skybot_cachefname)
     end_cache_time = time.time()
     print "Time for SkyBot to run:  {0:.1f} sec".format(
             end_cache_time - start_cache_time)

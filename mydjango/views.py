@@ -13,7 +13,7 @@ from django.core.urlresolvers import reverse
 from django.utils import simplejson
 import ephem
 from mydjango.settings import MEDIA_URL, MEDIA_ROOT
-
+from Utils.Constants import decode_obs_id
 #views for main smt pages
 
 def smt_home(request):
@@ -299,59 +299,3 @@ def smt_cadence(request):
                                'ticks':ticks},
                               context_instance=RequestContext(request))
 
-##########################################
-#bits to decode skymapper observation id
-
-ID_SEQ_NO_BITS   =  9 
-ID_OB_SEQ_BITS   =  5 
-ID_DR_SER_BITS   =  1 
-ID_FIELD_ID_BITS = 13 
-ID_OB_TYPE_BITS  =  4 
-ID_LOW_BITS = ( ID_SEQ_NO_BITS + ID_OB_SEQ_BITS + ID_DR_SER_BITS +
-                ID_FIELD_ID_BITS )
-
-TID_SEQ_NO_BITS    =  9 
-TID_OBSID_BITS     = 12 
-TID_SURVEY_ID_BITS =  7 
-TID_OB_TYPE_BITS   =  4
-
-OBSERVATION_TYPE = {"MS":1,
-                    "TFF":2,
-                    "3PS":3,
-                    "STD":4,
-                    "5SS":5,
-                    "BAD":6,
-                    "BIAS":7}
-
-def get_ob_name(ob_type):
-    ob_name=''
-    for key, value in OBSERVATION_TYPE.iteritems():
-        if value==ob_type:
-            ob_name=key
-            break
-    return ob_name
-
-def decode_obs_id(encoded_ids):
-    encoded_ids=int(encoded_ids)
-    if  (( encoded_ids >> ID_LOW_BITS ) & ( 2 ** ID_OB_TYPE_BITS - 1 )==OBSERVATION_TYPE["3PS"]  
-         or (encoded_ids >> ID_LOW_BITS ) & ( 2 ** ID_OB_TYPE_BITS - 1 )==OBSERVATION_TYPE["BAD"]):   
-        seq_no_3PS = encoded_ids & ( 2 ** TID_SEQ_NO_BITS   - 1 )   # Get sequence number
-        encoded_ids >>= TID_SEQ_NO_BITS    
-        obsid = encoded_ids & ( 2 ** TID_OBSID_BITS   - 1 )   # Get obsid number
-        encoded_ids >>= TID_OBSID_BITS
-        survey_id = encoded_ids & ( 2 ** TID_SURVEY_ID_BITS - 1 )   # Get survey number
-        encoded_ids >>= TID_SURVEY_ID_BITS 
-        ob_type  = encoded_ids & ( 2 ** TID_OB_TYPE_BITS  - 1 )   # Get observation type
-        return get_ob_name(ob_type), survey_id, obsid, seq_no_3PS
-    else:
-        encoded_ids >>= ID_SEQ_NO_BITS                                # Scrap observation id sequence number
-        ob_seq_no = encoded_ids & ( 2 ** ID_OB_SEQ_BITS   - 1 )   # Get sequence (filter) number
-        encoded_ids >>= ID_OB_SEQ_BITS         
-        dr_ser_no = encoded_ids & ( 2 ** ID_DR_SER_BITS   - 1 )   # Get data release or series number
-        encoded_ids >>= ID_DR_SER_BITS        
-        field_id  = encoded_ids & ( 2 ** ID_FIELD_ID_BITS - 1 )   # Get field id
-        encoded_ids >>= ID_FIELD_ID_BITS         
-        ob_type   = encoded_ids & ( 2 ** ID_OB_TYPE_BITS  - 1 )   # Get observation type
-        return get_ob_name(ob_type), field_id, dr_ser_no, ob_seq_no
-
-##########################################

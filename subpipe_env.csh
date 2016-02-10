@@ -61,13 +61,12 @@ setenv CANDDAILY $SUBPIPEDATA/cand_daily
 setenv CANDPATH $SUBPIPEDATA/candidates
 setenv CANDLOOKUP $SUBPIPEDATA/cand_lookup.fits
 # Local scratch disk for temporary calculations
-setenv SUBSCRATCH  /ramdisk/subpipe_production
-# Python environment -- include access to system packages, but override with
-# anything we've installed locally that's important for us.
-setenv PYTHONPATH ${PYTHONPATH}:${SUBPIPEHOME}:${SUBPIPEHOME}/STAP
-# setenv PYTHONPATH ${PYTHONPATH}:/usr/local/python-2.7.1/lib/python2.7/site-packages/
-# setenv PYTHONPATH ${PYTHONPATH}:${SUBPIPEEXT}/lib/python2.7/site-packages
+setenv SUBSCRATCH  /ramdisk/subpipe_production_test
+# Python environment -- baseline access to system packages only,
+# let user override in subpipe_env_${USER}.csh if necessary for testing.
+setenv PYTHONPATH .
 source $SUBPIPEEXT/bin/activate.csh
+setenv PYTHONPATH ${PYTHONPATH}:${SUBPIPEHOME}:${SUBPIPEHOME}/STAP
 # ... Brian's astrometry module ...........................................
 # cdsclient binaries, which Brian's stuff needs to run
 setenv PATH ${PATH}:${SUBPIPEEXT}/bin/cdsclient
