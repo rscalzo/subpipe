@@ -29,13 +29,15 @@ from mydjango.jobstats.STAP_API import register_job, register_run
 from mydjango.followup.STAP_API import register_xlist
 import mydjango.followup.models as fu
 import mydjango.jobstats.models as js
-
+from django.db.models import Count
+from Utils.Photometry import calc_fluxlim_img
 # RS 2012/05/25:  this version not integrated w/Django yet
 # def register_job(*args):  pass
 # def register_run(*args):  pass
 # def register_xsient(*args):  pass
-
-
+from django.db import transaction
+import numpy as np
+import re
 # ----------------------------------------------------------------------------
 #                            The main routine
 # ----------------------------------------------------------------------------
@@ -50,12 +52,18 @@ def main():
             "Correct headers of incoming images based on scheduler logs")
     parser.add_argument('--utdate', default=None,
             help="path to images (default: %(default)ss)'")
+    parser.add_argument('--searchdb', action='store_true', default=False,
+            help="search from jobstats database?")
     parser.add_argument('--nproc', type=int, default=32,
             help="number of processors to use (default: 32)")
     parser.add_argument('--waitfornew', action='store_true', default=False,
             help="wait for new files from given UT date?")
     parser.add_argument('--testing', action='store_true', default=False,
             help="test run, don't register or submit any jobs?")
+    parser.add_argument('--refonly', action='store_true', default=False,
+            help="builing refs only")
+    parser.add_argument('--noref', action='store_true', default=False,
+            help="do not submit ref jobs")
     args = parser.parse_args()
     print "Using pyfits version", pyfits.__version__
 
@@ -76,17 +84,18 @@ def main():
     # In particular, sort out glob strings for *local* dates for today UT.
     # Maybe someday I'll use ssh to query for header strings on markle,
     # which would be a more right answer than grepping on the filename...
-    if args.utdate is None:
-        today = ephem.now()
-    else:
-        today = ephem.Date(args.utdate.replace("-","/"))
-    tomorrow = ephem.Date(today + 1.0)
+    if not args.searchdb:
+        if args.utdate is None:
+            today = ephem.now()
+        else:
+            today = ephem.Date(args.utdate.replace("-","/"))
+        tomorrow = ephem.Date(today + 1.0)
     # today, tomorrow = ephem.Date(ephem.now() - 1.0), ephem.now()
-    today_str = today.datetime().strftime("%Y-%m-%d")
-    ngstr = [today.datetime().strftime("%Y-%m-%dT1"),
-             today.datetime().strftime("%Y-%m-%dT2"),
-             tomorrow.datetime().strftime("%Y-%m-%dT0")]
-    print "ngstr =", ngstr
+        today_str = today.datetime().strftime("%Y-%m-%d")
+        ngstr = [today.datetime().strftime("%Y-%m-%dT1"),
+                 today.datetime().strftime("%Y-%m-%dT2"),
+                 tomorrow.datetime().strftime("%Y-%m-%dT0")]
+        print "ngstr =", ngstr
 
     # Set up the queue for pipeline processes
     Q = Pipeline.LowMemQueue(name="Main Pipeline Queue", processors=args.nproc)
@@ -104,8 +113,9 @@ def main():
     pause_delay = 600                   # Length of pause cycle in seconds
 
     # Fetch a list of everything worth following before the run started
+    # !!! Need to turn off followup for old objects!!!
     xprelist = fu.Transient.objects.select_related().filter(
-        type__type__in=Constants.follow_types)
+        type__type__in=Constants.follow_types) #isactive=1
 
     # Get unique identifier for this run
     runtag = Constants.get_runtag(start_run_time)
@@ -118,30 +128,51 @@ def main():
     while 1:
 
         start_loop_time = time.time()
-
         # Check for new image data arriving from markle
         # There should be one NEW image in this directory for each exposure
         # of each CCD over the course of a night.
         # This assumes there's another process to download mosaic images
         # from markle, split and overscan-subtract them.
-        CPP_base_glob = Constants.PipelinePath.new + "/*/*/*/*"
-        #CPP_base_glob = Constants.PipelinePath.new + "/*/*/*/*_089*"
-        #CPP_base_glob2= Constants.PipelinePath.new + "/*/*/*/*_169*"
-        freshfnames = [f for f in
-                       # glob.glob(Constants.PipelinePath.new_glob_str)
-                       glob.glob(CPP_base_glob + ngstr[0] + "*.fits") +
-                       glob.glob(CPP_base_glob + ngstr[1] + "*.fits") +
-                       glob.glob(CPP_base_glob + ngstr[2] + "*.fits")
-                       if f not in donefnames]
-        """
+        if args.searchdb:
+            # FY - 2015/07/19 find freshfnames from database search
+            # find all pointing with status < 10 (not bad), and haven't been processed (no pipelinejob)
+            freshfnames = []
+            newpts=js.SkymapperImage.objects.filter(#pointing__program__in=['3PS'],
+                status=0,#pipelinejob__isnull=True,
+                pointing__dateobs__gte=datetime.datetime(2014,7,1,0,0,0),
+                ).exclude(pointing__field__id=0).order_by('pointing__dateobs').select_related('pointing','pointing__field')[:50]
+            #.order_by('-pointing__dateobs')
+            lennewpts=len(newpts)
+            print "Found new images:",lennewpts
+            with transaction.commit_on_success():
+                for newpt in newpts:
+                    freshfname =Constants.FilenamesNew.absolute_dir(newpt.pointing.field.id,newpt.pointing.filter,newpt.ccd)+'/'+newpt.pointing.filename+'_%d.fits'%newpt.ccd
+                    if os.path.exists(freshfname):
+                        if freshfname not in donefnames:
+                            freshfnames.append(str(freshfname))
+                    else:
+                        newpt.status=99  #non-exist
+                        newpt.save()
+            if len(freshfnames)==0:
+                print "No images on disk?"
+                print freshfnames
+        else:
+            CPP_base_glob = Constants.PipelinePath.new + "/*/*/*/*"
+            freshfnames = [f for f in
+                           # glob.glob(Constants.PipelinePath.new_glob_str)
+                           glob.glob(CPP_base_glob + ngstr[0] + "*.fits") +
+                           glob.glob(CPP_base_glob + ngstr[1] + "*.fits") +
+                           glob.glob(CPP_base_glob + ngstr[2] + "*.fits")
+                           if f not in donefnames]
+        #"""
         freshfnames = [f for f in freshfnames if f not in donefnames]
-        """
+        #"""        
 
         # Make sure they've finished copying!
         # RS:  Do them all at once; since each call to ensurecopy() means
         # at least a 5-second delay, sequential calls are much slower!
-        freshfnames = ensurecopy(freshfnames)
-        memtot, pmemtot = psmemchk('python subpipe_master.py')
+        #freshfnames = ensurecopy(freshfnames)
+        memtot, pmemtot = psmemchk('python subpipe_master_db.py')
         if not idle:
             print "subpipe_master.py:  running main loop at local time ",
             print time.asctime(time.localtime(start_loop_time))
@@ -150,8 +181,9 @@ def main():
             print "memory use {0:.1f} MB ({1:.1f}%)".format(memtot, pmemtot)
             sys.stdout.flush()
         idle = (len(fieldccdlock) == 0 and len(freshfnames) == 0)
-        if idle and (not args.waitfornew or
-                     ephem.now().datetime().strftime("%Y-%m-%d") != today_str):
+#        if idle and (not args.waitfornew or
+#                     ephem.now().datetime().strftime("%Y-%m-%d") != today_str):
+        if idle and (not args.waitfornew):
             print "subpipe_master.py:  ran out of stuff to do"
             print "Exiting normally at", time.asctime(time.localtime(start_loop_time))
             return
@@ -168,7 +200,7 @@ def main():
 
             # Pick up a new NEW
             new = Constants.FilenamesNew(newfname, runtag=runtag)
-
+            
             # If there's no room left, don't submit any more
             if len(fieldccdlock) >= Q.N_processors:  break
 
@@ -186,36 +218,45 @@ def main():
             if fieldccdtag in fieldccdlock:  continue
 
             # RS 2013/10/30:  Basic quality control
-            if new.seeing == None or new.seeing > 10.0 or new.elong > 1.2:
+            maxelong=1.3
+            if False: #new.seeing == None or new.elong > maxelong: # or new.seeing < 10.0
                 print "Skipping", new.basefname,
                 donefnames.append(new.absfname)
+                im=js.SkymapperImage.objects.get(pointing__filename='_'.join(new.basefname.split('_')[:-1]),ccd=new.subfield)
+                if im.status==0:
+                    im.status=80  #poor quality
+                    im.save()
                 if new.seeing == None:
                     print "because seeing not known"
-                elif new.seeing > 10.0:
-                    print "because seeing is terrible",
-                    print "({0} > 10.0)".format(new.seeing)
                 # RS 2015/04/28:  Removing this restriction for now because
                 # in bad seeing mode we're liable to get a lot of terrible
                 # images.  Keeping elongation cut though.
                 # elif new.seeing > 10.0:
                 #     print "because seeing is terrible",
                 #     print "({0} > 10.0)".format(new.seeing)
-                elif new.elong > 1.2:
+                elif new.elong > maxelong:
                     print "because elongation is terrible",
-                    print "({0} > 1.2)".format(new.elong)
+                    print "({0} > {1})".format(new.elong,maxelong)
                 continue
 
             # RS 2012/02/27:  Find a REF image for this NEW.  For now, just
             # pick the first one in this filter and area of the sky.
             # RS 2014/07/01:  Check to make sure that the list of pre-existing
             # transients actually come from the field being considered!
-            xprelist_loc = xprelist.filter(field=new.field)
-            refname = pick_ref(new, xprelist=xprelist_loc, verbose=True)
-            sys.stdout.flush()
-            if refname == None:
+            refname = None
+            refonly=args.refonly
+            if new.program =='MS': refonly=True
+            if not refonly:
+                xprelist_loc = xprelist.filter(field=new.field)
+                refname = pick_ref(new, xprelist=xprelist_loc, verbose=True)
+                sys.stdout.flush()
+            if refname is None and not refonly and args.noref:
+                print "Skipping", new.basefname
+                donefnames.append(new.absfname)
+            if refname == None or refonly:
                 # RS 2013/09/12:  Added feature which runs an image as a REF
                 # if no suitable REF exists for this part of the sky.
-                print "Can't find reference image for " + new.basefname
+                #print "Can't find reference image for " + new.basefname
                 print "Submitting it as reference-building job instead."
                 sub = Constants.FilenamesRef(newfname, runtag=runtag)
                 workflow = STAP_thread_runref(
@@ -223,6 +264,23 @@ def main():
                         logfile=sub.log_file_name)
                 Qargs = (workflow, new.absfname)
             else:
+                # FY 2015/08: before subtraction job, update xref
+                # Ideally this should be updated when database is updated from web, but web server doesn't have permission for the xref files.
+                xreffile = "{0}/{1:04d}/{2:02d}/{1:04d}_{2}_xref.fits".format(Constants.PipelinePath.xref,new.field,new.subfield)
+                if os.path.exists(xreffile):
+                    trans=list(fu.Transient.objects.filter(field=new.field,ccd=new.subfield).select_related('type__type'))
+                    hdulist=pyfits.open(xreffile,mode='update')
+                    for (key, value) in hdulist[0].header.items():
+                        namematch = re.match("NAME(\d{4})", key)
+                        if namematch:
+                            id=int(namematch.group(1))
+                            transtype=[tran.type.type for tran in trans if tran.name==value]
+                            if len(transtype)>0:
+                                hdulist[0].header.update("TYPE{0:04d}".format(id),
+                                                         str(transtype[0]),
+                                                         "Type of source with index {0}".format(id))
+                    hdulist.close()
+
                 # RS 2012/02/23:  Subs are now identified by start_run_time,
                 # (i.e., by the time the script started), not start_loop_time.
                 sub = Constants.FilenamesSub(newfname, runtag)
@@ -242,10 +300,30 @@ def main():
             # in a previous run, skip it.  Also, find a more elegant way to
             # do this later.
             workflow._setup_workflow(*(Qargs[1:]))
-            if all([os.path.exists(fn) for fn in workflow._copy_back]):
-                print "Skipping {0}, we already ran it".format(workflow.name)
-                donefnames.append(new.absfname)
-                continue
+            if refname==None or refonly:
+                done=all([os.path.exists(fn) for fn in workflow._copy_back if
+                          'wcs.fits.stars' in fn])
+                if done:
+                    print "Skipping {0}, we already ran it".format(workflow.name)
+                    donefnames.append(new.absfname)
+                    im=js.SkymapperImage.objects.get(pointing__filename='_'.join(new.basefname.split('_')[:-1]),ccd=new.subfield)
+                    if im.status==0:
+                        im.status=1
+                        im.save()
+                    continue
+            else:
+                done=False #all([os.path.exists(fn) for fn in workflow._copy_back if
+                          #'wcs.fits.stars' in fn or 'remap.fits.stars' in fn])
+                #done=all([os.path.exists(fn) for fn in workflow._copy_back if
+                #          'wcs.fits.stars' in fn]) #not redo subtraction for now
+                if done:
+                    print "Skipping {0}, we already ran it".format(workflow.name)
+                    donefnames.append(new.absfname)
+                    im=js.SkymapperImage.objects.get(pointing__filename='_'.join(new.basefname.split('_')[:-1]),ccd=new.subfield)
+                    if im.status<2:
+                        im.status=2
+                        im.save()                                
+                    continue
 
             # If we're just testing, don't submit any jobs
             if args.testing:
@@ -358,7 +436,7 @@ def pick_ref(new, xprelist=None, verbose=False):
         # in their headers.  We *should* know the NEW seeing now as well.
         # Pick a reasonable range of seeing which should result in a good
         # subtraction.  Within this range, pick the deepest image.
-        best_dt, best_seeing, best_zp = -1.0, 99.9, 0.0
+        best_dt, best_seeing, best_maglim = -1.0, 99.9, 0.0
         if new.seeing is None:
             seelo, seehi = 0.0, 99.9
         elif new.seeing < 6.01:
@@ -385,7 +463,7 @@ def pick_ref(new, xprelist=None, verbose=False):
                 print "-- rejected (trapped IOError / file unreadable)"
                 continue
             # Status debugging statements
-            kwhash = { 'DATE-OBS': 'None', 'SEEING': 'None', 'ZPMAG': 'None' }
+            kwhash = { 'DATE-OBS': 'None', 'SEEING': 'None', 'ZPMAG': 'None', 'BKGSIG': 'None' }
             # Don't pick an image as REF with no DATE-OBS, SEEING or ZPMAG
             complete = True
             for kw in kwhash:
@@ -406,19 +484,23 @@ def pick_ref(new, xprelist=None, verbose=False):
             dt = latest_allowed - mydateobs
             # If we don't know what the NEW's seeing is, pick as the REF
             # the best seeing from among the available REFs
-            seeing, zp = hdr['SEEING'], hdr['ZPMAG']
-            if new.seeing == None and seeing < best_seeing:
-                refname, best_dt, best_seeing, best_zp = fn, dt, seeing, zp
+            seeing, zp, bkgsig = hdr['SEEING'], hdr['ZPMAG'], hdr['BKGSIG']
+            maglim = -2.5*np.log10(calc_fluxlim_img(bkgsig, CL=0.50)) + zp
+            if new.seeing == None and seeing < best_seeing and maglim > best_maglim:
+                refname, best_dt, best_seeing, best_maglim = fn, dt, seeing, maglim
                 if verbose:  print "-- best so far (unknown seeing)"
             # If we know what the NEW's seeing is, pick as the REF
             # the deepest image with seeing better than the NEW
-            elif seelo < seeing < seehi and zp > best_zp:
-                refname, best_dt, best_seeing, best_zp = fn, dt, seeing, zp
+            elif seelo < seeing < seehi and maglim > best_maglim:
+                refname, best_dt, best_seeing, best_maglim = fn, dt, seeing, maglim
                 if verbose:  print "-- best so far (deepest w/suitable seeing)"
             elif seeing > seehi:
                 if verbose:  print "-- rejected (REF seeing worse than NEW)"
                 continue
             # Otherwise, just move on.
+            elif seeing <seelo:
+                if verbose: print "-- rejected (REF seeing worse than NEW)"
+                continue
             else:
                 if verbose:  print "-- rejected (worse than current best)"
         # print "Chose {0} with seeing {1}".format(refname, best_seeing)
@@ -428,8 +510,8 @@ def pick_ref(new, xprelist=None, verbose=False):
             return None
         else:
             if verbose:
-                print "Picked reference with dt, seeing, zp =",\
-                       best_dt, best_seeing, best_zp
+                print "Picked reference with dt, seeing, maglim =",\
+                       best_dt, best_seeing, best_maglim
             return refname
 
 
@@ -454,6 +536,8 @@ def ensurecopy(files, delay=5, timeout=60, path=None):
             fsize0[f] = 1
             fsize1[f] = os.path.getsize(f)
         except OSError as e:
+            fsize0[f] = 1
+            fsize1[f] = 1
             badfiles.append(f)
 
     # If we have *only* bad files, return
@@ -469,6 +553,7 @@ def ensurecopy(files, delay=5, timeout=60, path=None):
             try:
                 fsize1[f] = os.path.getsize(f)
             except OSError:
+                fsize1[f] = 1
                 badfiles.append(f)
 
     # Return all not-bad files that are done copying
@@ -491,28 +576,28 @@ def cache_pointing_info(meta):
     print "Running pre-cache for pointing {0} {1}...".format(smfield, dtobs)
 
     # Query SkyBot
-    start_cache_time = time.time()
-    subprocess.call("mkdir -p {0}".format(
-        os.path.dirname(meta.skybot_cachefname)), shell=True)
-    roids = SkybotObject.webquery(ra=smfield.ra, dec=smfield.dec,
-                                  datetime=dtobs, rm=120,
-                                  cachefname=meta.skybot_cachefname)
-    end_cache_time = time.time()
-    print "Time for SkyBot to run:  {0:.1f} sec".format(
+    if not os.path.exists(meta.skybot_cachefname):
+        start_cache_time = time.time()
+        subprocess.call("mkdir -p {0}".format(
+                os.path.dirname(meta.skybot_cachefname)), shell=True)
+        roids = SkybotObject.webquery(ra=smfield.ra, dec=smfield.dec,
+                                      datetime=dtobs, rm=120,
+                                      cachefname=meta.skybot_cachefname)
+        end_cache_time = time.time()
+        print "Time for SkyBot to run:  {0:.1f} sec".format(
             end_cache_time - start_cache_time)
 
     # Query SDSS
-    if os.path.exists(meta.sdss_cachefname):
-        return
-    # Only do this if file doesn't exist
-    subprocess.call("mkdir -p {0}".format(
-            os.path.dirname(meta.sdss_cachefname)), shell=True)
+    if not os.path.exists(meta.sdss_cachefname):
+        # Only do this if file doesn't exist
+        subprocess.call("mkdir -p {0}".format(
+                os.path.dirname(meta.sdss_cachefname)), shell=True)
     # FY - if ra is less than -30, don't bother to check, but write an empty file
-    if smfield.dec<-30: os.system('touch {0}'.format(meta.sdss_cachefname))
-    else:
-        sdss = SDSSObject.webquery(ra=smfield.ra, dec=smfield.dec,
-                                   rm=120,
-                                   cachefname=meta.sdss_cachefname)
+        if smfield.dec<-30: os.system('touch {0}'.format(meta.sdss_cachefname))
+        else:
+            sdss = SDSSObject.webquery(ra=smfield.ra, dec=smfield.dec,
+                                       rm=120,
+                                       cachefname=meta.sdss_cachefname)
 
 # ----------------------------------------------------------------------------
 #                        This is a callable script

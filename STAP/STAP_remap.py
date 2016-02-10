@@ -59,10 +59,10 @@ def remap(newname, refname, outname,
         # RS 2011/10/28:  This part is a bit fiddly -- we have to copy the NEW's
         # FITS header to a separate file before we can remap.  Use pyfits.
         # FY - really only want the WCS solution of new
-        # important to preserve the SATURATE, GAIN, EXPTIME, RDNOISE, NCOADD
+        # important to preserve the SATURATE, GAIN, EXPTIME, RDNOISE
         refhdr=pyfits.getheader(refname)
         with pyfits.open(newname) as newptr:
-            for key in ['EXPTIME','SATURATE','GAIN','RDNOISE','NCOADD','SEEING']:
+            for key in ['EXPTIME','SATURATE','GAIN','RDNOISE','SEEING']:
                 newptr[0].header.update(key,refhdr[key])
             with open(outname.replace(".fits",".head"),"w") as newrefhdr:
                 newrefhdr.write(str(newptr[0].header.ascardlist()))

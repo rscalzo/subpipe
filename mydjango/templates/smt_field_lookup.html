@@ -1,0 +1,41 @@
+{% extends "smt_base.html" %}
+
+{% block content %}
+<div id="pagecontent">
+  <table style="margin:0px;padding:0px;text-align:center">
+    <form action="" method="post" onSubmit=true>{% csrf_token %}
+      <tr><td colspan=4>Look up transients by ra/dec:</td></tr>
+      <tr><td colspan=4>
+	  <label for="trans_ra">RA:</label><input type="text"  id="trans_ra" name="trans_ra" value="{{trans_ra|floatformat:4}}"/>
+	  <label for="trans_dec">DEC:</label><input type="text" id="trans_dec" name="trans_dec" value="{{trans_dec|floatformat:4}}"/>
+	  <label for="trans_rad">Radius (degree):</label><input type="text" id="trans_rad" name="trans_rad" value="{{trans_rad|floatformat:4}}"/>
+	  <input type=submit value="Search">
+      </td></tr>
+    </form>
+    <tr><td>Name</td><td>RA</td><td>DEC</td><td>Distance</td></tr>
+    {% for trans in translist %}
+    <tr><td><a href="{% url trans_info trans.name %}">{{trans.name}}</a></td><td>{{trans.ra}}</td><td>{{trans.dec}}</td><td>{{trans.dist}}</td></tr>
+    {% endfor %}
+  </table>
+
+  <table style="margin:0px;padding:0px;text-align:center">
+    <form action="" method="post" onSubmit=true>{% csrf_token %}
+      <tr><td colspan=8>Look up skymapper fields by ra/dec:</td></tr>
+      <tr><td colspan=8>
+	  <label for="f_ra">RA:</label><input type="text" id="f_ra" name="f_ra" value="{{f_ra|floatformat:4}}"/>
+	  <label for="f_dec">DEC:</label><input type="text" id="f_dec" name="f_dec" value="{{f_dec|floatformat:4}}"/>
+	  <label for="f_rad">Radius (degree):</label><input type="text"  id="f_rad" name="f_rad" value="{{f_rad|floatformat:4}}"/>
+	  <input type=submit value="Search">
+      </td></tr>
+    </form>
+    <tr><td>Field ID</td><td>RA</td><td>DEC</td><td>Distance</td><td>CCD</td>
+      <td>Last Obs</td><td>Label</td><td>Rank</td><td>Cadence</td></tr>
+    {% for field in fieldlist %}
+    <tr><td>{{field.id}}</td><td>{{field.ra}}</td><td>{{field.dec}}</td><td>{{field.dist}}</td><td>{{field.ccd}}</td>
+      <td>{{field.lastobs}}</td><td>{{field.label}}</td><td>{{field.rank}}</td><td>{{field.cadence}}</td></tr>
+    {% endfor %}
+ </table>
+
+</div>
+
+{% endblock %}

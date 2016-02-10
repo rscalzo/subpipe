@@ -61,7 +61,7 @@ setenv CANDDAILY $SUBPIPEDATA/cand_daily
 setenv CANDPATH $SUBPIPEDATA/candidates
 setenv CANDLOOKUP $SUBPIPEDATA/cand_lookup.fits
 # Local scratch disk for temporary calculations
-setenv SUBSCRATCH  /ramdisk/subpipe_production_test
+setenv SUBSCRATCH  /ramdisk/subpipe_production
 # Python environment -- baseline access to system packages only,
 # let user override in subpipe_env_${USER}.csh if necessary for testing.
 setenv PYTHONPATH .

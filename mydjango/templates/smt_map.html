@@ -1,0 +1,147 @@
+{% extends "smt_base.html" %}
+
+{% block htmlhead %}
+<link rel="stylesheet" href="{{STATIC_URL}}css/jquery-ui.custom.css"/>
+<script type="text/javascript" src="{{STATIC_URL}}js/jquery.js"></script>
+<script type="text/javascript" src="{{STATIC_URL}}js/jquery.ui.core.js"></script>
+<script type="text/javascript" src="{{STATIC_URL}}js/jquery.ui.widget.js"></script>
+<script type="text/javascript" src="{{STATIC_URL}}js/jquery.ui.datepicker.js"></script>
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<!--<script src="//code.jquery.com/jquery-1.11.0.min.js"></script>-->
+<script type="text/javascript" src="{{STATIC_URL}}js/slider/range.js"></script>
+<script type="text/javascript" src="{{STATIC_URL}}js/slider/timer.js"></script>
+<script type="text/javascript" src="{{STATIC_URL}}js/slider/slider.js"></script>
+<link type="text/css" rel="StyleSheet" href="{{STATIC_URL}}js/slider/winclassic.css" />
+<script type="text/javascript" src="{{STATIC_URL}}js/hammer.js"></script>
+<script type="text/javascript" src="{{STATIC_URL}}js/map.js"></script> 
+<script type="text/javascript">
+  $(function() {  
+  $( "#from" ).datepicker({dateFormat: "yy-mm-dd",
+  defaultDate: "{{fromnight.year}}-{{fromnight.month}}-{{fromnight.day}}",
+  changeMonth: false,
+  numberOfMonths: 1,
+  onClose: function( selectedDate ) {
+  $( "#to" ).datepicker( "option", "minDate", selectedDate );
+  }
+  });
+  $( "#to" ).datepicker({dateFormat: "yy-mm-dd",
+  defaultDate: "{{tonight.year}}-{{tonight.month}}-{{tonight.day}}",
+  changeMonth: false,
+  numberOfMonths: 1,
+  onClose: function( selectedDate ) {
+  $( "#from" ).datepicker( "option", "maxDate", selectedDate );
+  }
+  });
+  });
+
+  var projName = "HammerProjection";
+  var json={{fields|safe}};
+  
+  var fields = json['fields'];
+
+  var proj = new window[projName]();
+  var projMap;
+  // window.onload = function() { projMap = new ProjectionMap(proj); };
+  $( document ).ready(function() {
+  projMap = new ProjectionMap(proj);
+  });
+
+</script>
+{% endblock %}
+
+
+{% block content %}
+<div id="description">
+
+<table>
+  <form action="" method="post" onSubmit=true>{% csrf_token %}
+    <!--<tr><td id="debug">Displaying observations {{filter}} {{fromnight.year}}-{{fromnight.month}}-{{fromnight.day}} to {{tonight.year}}-{{tonight.month}}-{{tonight.day}}</td></tr>-->
+    <tr><td>Select observation types to plot:
+	<input type=checkbox name="plot_bad" value="plotobs" {% if 'BAD' in progtypes %}checked{% endif %} >BAD</input>
+	<input type=checkbox name="plot_3ps" value="plotobs" {% if '3PS' in progtypes %}checked{% endif %} >3PS</input>
+	<input type=checkbox name="plot_ms" value="plotobs" {% if 'MS' in progtypes %}checked{% endif %} >MS</input>
+    </td></tr>
+    <tr><td>Select day range to plot:
+	<label for="from">From</label>
+	<input type="text" id="from" name="from" value="{{fromnight.year}}-{{fromnight.month|stringformat:'02d'}}-{{fromnight.day|stringformat:'02d'}}"/>
+	<label for="to">to</label>
+	<input type="text" id="to" name="to" value="{{tonight.year}}-{{tonight.month|stringformat:'02d'}}-{{tonight.day|stringformat:'02d'}}"/>
+    </td></tr>
+    <tr><td>Select filter to plot:
+	<select name="plot_filt">
+	  <option value="g" {% if filter == 'g' %} selected {% endif %}>g</option> <option value="r" {% if filter == 'r' %} selected {% endif %}>r</option>
+	  <option value="i" {% if filter == 'i' %} selected {% endif %}>i</option> <option value="v" {% if filter == 'v' %} selected {% endif %}>v</option>
+	  <option value="u" {% if filter == 'u' %} selected {% endif %}>u</option> <option value="z" {% if filter == 'z' %} selected {% endif %}>z</option>
+	</select>
+    </td></tr>
+    <tr><td>
+	<input type="submit" id="update" value="Update">
+    </td></tr>
+    <tr><td><p><br/><br/><br/><br/></td></p></tr>
+  </form>
+  <tr><td>
+      <font size=-1>Drag/move by mouse. Use slider to rotate/zoom. 
+	Hold S to select by mouse. Hold D to de-select by mouse. Press C to de-select all.</font><br />
+      <canvas id="map" width="1080" height="720" style="z-index: 100; position:                                                                                    
+							relative; border: 1px solid #333333; background-color: #000000;">
+	<p>Your browser does not support canvas.</p>
+      </canvas>
+      <canvas id="selectCanvas" style="z-index: 200; position: absolute;
+				       -ms-filter:'progid:DXImageTransform.Microsoft.Alpha(Opacity=0)'; filter:   
+				       alpha(opacity=0); "></canvas>
+      <font size=+2>
+	<table style='background-color:white;margin-left:auto;margin-right:auto;'><tr>
+        <td style='background-color:rgba(255,0,255,0.5)'>Bad seeing program</td>
+        <td style='background-color:rgba(0,128,0,0.5)'>3rd party program</td>
+        <td style='background-color:rgba(0,255,255,0.5)'>Main Survey</td>
+        <!--<td style='background-color:rgba(255,215,0,0.5)'>Subtracted bad seeing</td> -->
+      </tr></table>
+	</font>
+      <table border='0' id="MapToolbar" align='center' cellpadding=0
+	     cellspacing=0 style='font-size:11pt;'><tr>
+	  <td width='205'> 
+	    <div class="slider" id="slider-1" tabIndex="1">
+	      <input type='range' class="slider-input" id="slider-input-1"
+		     name="slider-input-1"/></div>
+	  </td>
+	  <td width=25>
+	    <image src='javascript/slider/play.gif' width='25' title='Spin'
+		   onClick="javascript:btnSpin_OnClick(this);">
+	  </td>
+	  <td width=110 align='left'>
+	    &nbsp;Rotation: <div id='vRotation' style='display: inline;'>0</div>&deg;
+	  </td>
+	  
+	  <td width='205'>
+	    <div class="slider" id="slider-2" tabIndex="1">
+	      <input type='range' class="slider-input" id="slider-input-2"
+		     name="slider-input-2"/></div>
+	  </td>
+	  <td width=100 align='left'>
+	    Zoom: <div id='vZoom' style='display: inline;'>10</div>
+	  </td>
+	  
+	  <td align='left' width='80'>
+	    <input type=button value='Reset' onClick="javascript:useDefault();"
+		   title="Click to reset to default value">
+	  </td>
+	  
+	  <td width='175'><div id="example"></div></td>
+	</tr>
+	
+	<tr>
+	  <td colspan='2' valign='top'>Selected Fields (id, ra, dec):
+	    <div id="FrameCount" style="display: inline;"></div> 
+            <br><TEXTAREA ID='FrameList' rows=5 style='width: 230px;'
+			  READONLY></TEXTAREA></td>
+	  <td colspan='5'> <div id="tmp"></div><!--Used to print debug
+							information.--> </td>
+	</tr>
+      </table>
+      <!--Tool bar. End.-->
+  </td></tr>
+</table>
+
+</div>
+
+{% endblock %}

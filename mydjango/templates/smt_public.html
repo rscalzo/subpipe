@@ -1,0 +1,33 @@
+{% extends "smt_base.html" %}
+
+{% block content %}
+<div id="description">
+  <p>The SkyMapper Transient (SMT) search is a rolling search of the southern and
+    equatorial sky utilizing the SkyMapper Telescope. The search is designed
+    to ulitize the poor seeing nights at SSO, covering approximately 1000 deg2 per
+    full night with an expected cadence of 3-4 nights. </p>
+  
+  <p>Below is the list of all active transients found by SkyMapper. Alternatively, the list can be downloaded as a .csv file from 
+    <a href={{publicurl}}> here </a></p>
+</div>
+
+<div id="pagecontent">
+  <table style="margin:0px;padding:0px;text-align:center">
+    <thead>
+      <tr>{% for head in headers %}
+	<td style="padding:5px;margin:5px;text-align:center">{{head|safe}}</td>
+	{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr {{row.html}}>
+        {% for item in row.data %}
+        <td style="padding:5px;margin:5px;text-align:center">{{item|safe}}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+  </table>
+</div>
+
+{% endblock %}

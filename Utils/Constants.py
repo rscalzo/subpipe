@@ -286,8 +286,8 @@ class Filenames(object):
                 maxra, maxdec = hdr['MAXRA'], hdr['MAXDEC']
                 coomin = ephem.Equatorial(minra, mindec)
                 coomax = ephem.Equatorial(maxra, maxdec)
-                self.minra,self.mindec=coomin.ra,coomin.dec
-                self.maxra,self.maxdec=coomax.ra,coomax.dec
+                self.minra,self.mindec=float(coomin.ra),float(coomin.dec)
+                self.maxra,self.maxdec=float(coomax.ra),float(coomax.dec)
             else:
                 self.minra,self.mindec=0.,0.
                 self.maxra,self.maxdec=0.,0.
@@ -458,6 +458,10 @@ class FilenamesSub(Filenames):
                 if hasattr(new, 'bkgsig'):    self.bkgsig = new.bkgsig
                 if hasattr(new, 'maglim50'):  self.maglim50=new.maglim50
                 if hasattr(new, 'maglim95'):  self.maglim95=new.maglim95
+                if hasattr(new, 'minra'):     self.minra=new.minra
+                if hasattr(new,'maxra'):     self.maxra=new.maxra
+                if hasattr(new,'mindec'):     self.mindec=new.mindec
+                if hasattr(new,'maxdec'):     self.maxdec=new.maxdec
                 if hasattr(new, 'skybot_cachefname'):
                     self.skybot_cachefname = new.skybot_cachefname
                 if hasattr(new, 'sdss_cachefname'):
