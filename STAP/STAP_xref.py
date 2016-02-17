@@ -32,13 +32,16 @@ def xref(mergedfname, candsfnames=[ ], lcfnames=[ ], skybot_cachefname=None, sds
     merger = DetectionMerger(mergedfname, verbose=True)
     for fn in candsfnames:  merger.update_predetections(fn, replace=replace)
     merger.register_xids(write_lc=(lcfnames == None))
+    
+    # The "vetbot" part:  Run some common vetting tasks.
+    merger.vetbot(skybot_cachefname=skybot_cachefname,sdss_cachefname=sdss_cachefname)
+
+    # FY - run vetbot first, then save the results
     merger.write_fits_file(mergedfname)
 
     # If there were any light curve files given, compile light curves.
     merger.compile_lightcurves(lcfnames)
 
-    # The "vetbot" part:  Run some common vetting tasks.
-    merger.vetbot(skybot_cachefname=skybot_cachefname,sdss_cachefname=sdss_cachefname)
 
     # Cross-check asteroid completeness
     # merger.compile_roidxchcke(candsfnames + lcfnames)

@@ -196,6 +196,15 @@ class Workflow(object):
         # Return entire Workflow object with filled "output" attribute
         return self
 
+    def stages_generator(self):
+        """
+        Generator over the stages and their parameters (for testing)
+        """
+        for stage in self._stagelist:
+            if len(stage) > 3:  stage_kwargs = stage[3]
+            else:  stage_kwargs = { }
+            yield stage[0], stage[1], stage[2], stage_kwargs
+
     def print_banner(self, stagename):
         """Prints a banner in the log output with the stage name"""
         now = time.asctime(time.localtime(time.time()))

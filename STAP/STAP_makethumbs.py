@@ -8,16 +8,34 @@ import glob
 import pyfits
 from STAP_comm import print_cmd_line
 from STAP.STAP_display import STAP_make_thumbs_xy, sky2xy
-from Utils.Constants import FilenamesSub, Find_Image_Set, ThumbNames
+from Utils.Constants import FilenamesSub, Find_Image_Set, ThumbNames, follow_types
 import subprocess
 
-def makethumbs(lcfnames,outputdir='.',localonly=False,redoall=False):
+def makethumbs(lcfnames,xref=None, outputdir='.',localonly=False,redoall=False):
+    #the initial call
+    print_cmd_line("STAP_makethumbs.py", lcfnames, xref=xref,outputdir=outputdir,localonly=localonly)
     if not lcfnames:
-        # RS 2013/10/05:  For now let's only get the subtracted light curves.
-        # I think it would be useful to do the unsubtracted ones, but let's
-        # implement that when we have a little more free time.
-        lcfnames=glob.glob('./*_sub_lc.fits')
+        if not xref is None: 
+            if not os.path.exists(xref): xref=None
+        if xref:
+            # FY - get the objectnames from xref file
+            lcfnames=[]
+            head=pyfits.getheader(xref)
+            for (key, value) in head.items():
+                namematch = re.match("NAME(\d{4})", key)     
+                if namematch:
+                    id=int(namematch.group(1))
+                    objtype=head["TYPE{0:04d}".format(id)]
+                    if objtype == "?" or objtype in follow_types:
+                        if os.path.exists('./%s_sub_lc.fits'%value):
+                            lcfnames.append('./%s_sub_lc.fits'%value)
+        else:
+            # RS 2013/10/05:  For now let's only get the subtracted light curves.
+            # I think it would be useful to do the unsubtracted ones, but let's
+            # implement that when we have a little more free time.
+            lcfnames=glob.glob('./*_sub_lc.fits')
     if not lcfnames:
+        print "No object (of unknown or followup type) that needs thumbnails."
         return
 
     # RS 2014/02/19:  Don't forget to print the command line so that we can
@@ -49,10 +67,16 @@ def extract_lcfiles(lcfnames,localonly,redoall):
     for lcfile in lcfnames:
         objname=pyfits.getheader(lcfile)['CANDNAME']
         tb=pyfits.getdata(lcfile)
+        hasobsid='OBSID' in tb.dtype.names
         for rowid, row in enumerate(tb):
-            subid=FilenamesSub.subid_from_fields(
-                runtag=row['RUNTAG'],field=int(row['SM_FIELD']),filter=row['FILTER'],
-                obsseq=row['OBSSEQ'], subfield=int(row['SUBFIELD']))
+            if hasobsid:
+                subid=FilenamesSub.subid_from_fields(
+                    runtag=row['RUNTAG'],field=int(row['SM_FIELD']),filter=row['FILTER'],
+                    obsid=row['OBSID'],obsseq=row['OBSSEQ'], subfield=int(row['SUBFIELD']))
+            else:
+                subid=FilenamesSub.subid_from_fields(
+                    runtag=row['RUNTAG'],field=int(row['SM_FIELD']),filter=row['FILTER'],
+                    obsseq=row['OBSSEQ'], subfield=int(row['SUBFIELD']))
             if (not subid in lc_registry) and (not subid in badsubid):
                 imnames = Find_Image_Set(subid,localonly=localonly)
                 if imnames:
@@ -77,7 +101,8 @@ def extract_lcfiles(lcfnames,localonly,redoall):
                         lc_registry[subid]["ras"].append(row['ALPHA_J2000'])
                         lc_registry[subid]["decs"].append(row['DELTA_J2000'])
                 else:
-                    print "Not re-making thumbnails for object: {0}, subid: {1}.".format(objname,subid)
+                    pass
+                    #print "Not re-making thumbnails for object: {0}, subid: {1}.".format(objname,subid)
 
     return lc_registry
 
@@ -109,12 +134,13 @@ def main():
 #    parser.add_argument("--newname",help='new image name')
 #    parser.add_argument("--refname",help='ref image name')
 #    parser.add_argument("--subname",help='sub image name')
+    parser.add_argument("--xref", default=None,help="optional input xref file")
     parser.add_argument("--localonly",action='store_true', default=False)
     parser.add_argument("--output",help='output directory name')
     args = parser.parse_args()
     
     
-    makethumbs(args.lcfnames,outputdir=args.output,localonly=args.localonly)
+    makethumbs(args.lcfnames,xref=args.xref,outputdir=args.output,localonly=args.localonly)
 
 if __name__ == "__main__":
     main()

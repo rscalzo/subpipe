@@ -37,24 +37,53 @@ def hotpants(newname, refname, subname, sexstamps=False, timeout=None):
     # RS 2015/05/25:  Switches marked "++" slow down hotpants significantly.
     # Fortunately they don't seem to be mission-critical.
     
+    #set some default values
+    newsat=refsat=Constants.Imager.saturate_adu
+    newgain=refgain=Constants.Imager.gain
+    newread=refread=Constants.Imager.read_noise
+    #update with values in header
+    newhdr=pyfits.getheader(newname)
+    refhdr=pyfits.getheader(refname)
+    if 'SATURATE' in newhdr:
+        if newhdr['SATURATE']>0: newsat=newhdr['SATURATE']
+    if 'SATURATE' in refhdr:
+        if refhdr['SATURATE']>0: refsat=refhdr['SATURATE']
+    if 'GAIN' in newhdr:
+        if newhdr['GAIN']>0: newgain=newhdr['GAIN']
+    if 'GAIN' in refhdr:
+        if refhdr['GAIN']>0: refgain=refhdr['GAIN']
+    if 'RDNOISE' in newhdr:
+        if newhdr['RDNOISE']>0: newread=newhdr['RDNOISE']
+    if 'RDNOISE' in refhdr:
+        if refhdr['RDNOISE']>0: refread=refhdr['RDNOISE']
+    #lower valid count
+    #default
+    tl=-100
+    il=-100
+    #estimate from background-10*sig
+    if 'BKGMED' in refhdr and 'BKGSIG' in refhdr:
+        tl=refhdr['BKGMED']-10*refhdr['BKGSIG']
+    if 'BKGMED' in newhdr and 'BKGSIG' in newhdr:
+        il=newhdr['BKGMED']-10*newhdr['BKGSIG']
+        
     switches = \
     [
         # Upper saturation limits for pixels to subtract
-        "-tu {0:.1f}".format(Constants.Imager.saturate_adu),
-        "-iu {0:.1f}".format(Constants.Imager.saturate_adu),
-        # Upper saturation limits for pixels to use in the PSF matching kernel
-        "-tuk {0:.1f}".format(Constants.Imager.saturate_adu),
-        "-iuk {0:.1f}".format(Constants.Imager.saturate_adu),
+        "-tu {0:.1f}".format(refsat),
+        "-iu {0:.1f}".format(newsat),
+        # Upper saturation limits for pixels to us in the PSF matching kernel
+        "-tuk {0:.1f}".format(refsat*0.9),
+        "-iuk {0:.1f}".format(newsat*0.9),
         # Lower valid data count
-        "-tl -100",
-        "-il -100",
+        "-tl {0:.1f}".format(tl),
+        "-il {0:.1f}".format(il),
         # Detector gain
-        "-tg {0:.1f}".format(Constants.Imager.gain),
-        "-ig {0:.1f}".format(Constants.Imager.gain),
+        "-tg {0:.1f}".format(refgain),
+        "-ig {0:.1f}".format(newgain),
         # Detector read noise
-        "-tr {0:.1f}".format(Constants.Imager.read_noise),
-        "-ir {0:.1f}".format(Constants.Imager.read_noise),
-        # ++ Outer limit half-width of kernel in pixels
+        "-tr {0:.1f}".format(refread),
+        "-ir {0:.1f}".format(newread),
+        # Outer limit half-width of kernel in pixels
         # "-r {0:d}".format(Constants.Imager.rpsf),
         # Output kernel file (we're saving these)
         "-savexy " + kernel_reg_fname,

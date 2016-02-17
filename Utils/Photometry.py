@@ -201,7 +201,7 @@ def calc_fluxlim_img(bkgsig, aperture=6.0, siglim=6.0, CL=0.95):
     return (siglim + dsig) * np.sqrt(np.pi) * (aperture/2.0) * bkgsig
 
 def calc_zp(stars, calstars, filter, verbose=False,
-            airmasses=None, apcors=None):
+            airmasses=None, apcors=None,use_colors=None):
     """Apply a calibration to zeropoint an array of SExtractorDetections.
 
     stars:      list of SExtractorDetections
@@ -270,7 +270,7 @@ def calc_zp(stars, calstars, filter, verbose=False,
             use_colors = False
             use_calstars = [good_calstars[i] for i in matchidx[incl]]
     else:
-        use_colors = True
+        if use_colors is None:use_colors = True
         use_calstars = [best_calstars[i] for i in matchidx[incl]]
     use_stars = good_stars[incl]
     if airmasses is not None:
@@ -307,11 +307,18 @@ def calc_zp(stars, calstars, filter, verbose=False,
         A = np.c_[np.ones(len(calzpclist))]
     popt, resid, rank, singvals = lstsq(A/sigma[:, None], zpmag/sigma)
     resids = zpf(calzpclist, airmasses, *popt) - zpmag
-    zpstat = sigma.std()/np.sqrt(len(sigma) - 1)
+    #if not use_colors:
+        ###weighted mean
+        #zp=np.sum(zpmag/sigma**2)/np.sum(1./sigma**2)
+        #zperr=1./np.sqrt((1./sigma**2).sum())
+        #print "weighted mean zp, zperr:",zp,zperr
+        #zpstat = 1./np.sqrt((1./sigma**2).sum()) 
+    #zpstat = sigma.std()/np.sqrt(len(sigma) - 1)
+    zpstat = np.sqrt((sigma**2).sum())/len(sigma)
     # Reiterate to make chisq_nu <= 1, if necessary
-    sysvar = resids.var() - sigma.mean()**2
+    sysvar = (resids**2).mean() - (sigma**2).mean()
     print "resids.std = {0:.3f}, sigma.mean = {1:.3f}".format(
-            resids.std(), sigma.mean())
+        resids.std(), sigma.mean())
     if sysvar <= 0:
         zpsys = 0.0
         chisq_nu = np.mean((resids/sigma)**2)

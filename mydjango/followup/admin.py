@@ -3,8 +3,8 @@ from mydjango.followup.models import Transient, Transient_Change, \
 from django.contrib import admin
 
 class TransientAdmin(admin.ModelAdmin):
-    list_display = ['name', 'ra', 'dec', 'field', 'ccd', 'type']
-    search_fields = ['name']
+    list_display = ['name', 'byname','ra', 'dec', 'field', 'ccd', 'type']
+    search_fields = ['name','byname']
     list_filter = ['type']
 
 class TransientChangeAdmin(admin.ModelAdmin):

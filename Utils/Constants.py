@@ -22,7 +22,6 @@ from Utils.Record import AsciiRecord
 from Utils.Catalog import CatalogEntry
 from Utils.TrackableException import TrackableException
 
-
 def svn_version():
     cmd = "svnversion -n " + os.environ['SUBPIPEHOME']
     proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
@@ -30,7 +29,6 @@ def svn_version():
 
 # Is this a production install?
 is_production_install = bool(int(os.environ["SUBPIPE_PRODUCTION_INSTALL"]))
-
 
 # ----------------------------------------------------------------------------
 #          Imager constants like gain, well depth, pixel scale etc.
@@ -106,11 +104,18 @@ def sso_sitegen():
     site.horizon = str(int(Imager.min_alt))
     return site
 
+try:
+    sso = sso_sitegen()
+except:
+    pass
 
-sso = sso_sitegen()
+follow_types = ['Cand', 'CandFaint','SN', 'Ia', 'Ibc', 'II', 'IIn', 'IIP', 'IIL', 'SLSN']
 
-follow_types = ['Cand', 'SN', 'Ia', 'Ibc', 'II', 'IIn', 'IIP', 'IIL', 'SLSN']
-
+FLAG_BADREF=80
+FLAG_OFFDISK=99
+MAX_REFELONG=1.3
+MAX_REFSEEING=10 #pixel
+MIN_REFDEPTH={'g':20.,'v':15.,'r':20.,'i':20.,'u':15.,'z':15.}  #check for different filters
 
 # ----------------------------------------------------------------------------
 #                     Pathname and filename conventions
@@ -120,7 +125,7 @@ follow_types = ['Cand', 'SN', 'Ia', 'Ibc', 'II', 'IIn', 'IIP', 'IIL', 'SLSN']
 class PipelinePath(object):
     """Namespace wrapper for pipeline directory structure"""
     home = os.environ["SUBPIPEHOME"]
-    ext = os.environ["SUBPIPEEXT"]
+#    ext = os.environ["SUBPIPEEXT"]
     bin = home + "/bin"                     # Binaries of useful executables
     etc = home + "/etc"                     # Global configuration files
     data = home + "/data"                   # Pipeline staging + output
@@ -204,6 +209,11 @@ def get_obsseq(filename):
     match = re.search("(\d+-\d+-\d+T\d+:\d+:\d+)", filename)
     if match != None:  return match.group(1)
     else: return None
+
+def get_obsid(filename):
+    match = re.search("(\d+)_\d+-\d+-\d+T\d+:\d+:\d+", filename)
+    if match != None:  return match.group(1)
+    else: return ''
     
 def get_basename(filename):
     match = re.search("(\S+\d+-\d+-\d+T\d+:\d+:\d+)",filename)
@@ -265,17 +275,42 @@ class Filenames(object):
             # Standard deviation of background pixels
             if 'BKGSIG' in hdr:  self.bkgsig = float(hdr['BKGSIG'])
             else:  self.bkgsig = 0.0
+            if 'BKGMED' in hdr:  self.bkgmed = float(hdr['BKGMED'])
+            else:  self.bkgmed = 0.0
+            if 'MAGLIM50' in hdr:  self.maglim50 = float(hdr['MAGLIM50'])
+            else:  self.maglim50 = 0.0
+            if 'MAGLIM95' in hdr:  self.maglim95 = float(hdr['MAGLIM95'])
+            else:  self.maglim95 = 0.0
+            if 'MINRA' in hdr:
+                minra, mindec = hdr['MINRA'], hdr['MINDEC']
+                maxra, maxdec = hdr['MAXRA'], hdr['MAXDEC']
+                coomin = ephem.Equatorial(minra, mindec)
+                coomax = ephem.Equatorial(maxra, maxdec)
+                self.minra,self.mindec=float(coomin.ra),float(coomin.dec)
+                self.maxra,self.maxdec=float(coomax.ra),float(coomax.dec)
+            else:
+                self.minra,self.mindec=0.,0.
+                self.maxra,self.maxdec=0.,0.
+            if 'PROGRAM' in hdr: self.program = hdr['PROGRAM']
+            else: 
+                try: 
+                    self.program = decode_obs_id(filename.split('/')[-1].split('_')[1])[0]
+                except:
+                    self.program = 'unknown'
         # Fill dummy "id" field so we can use this for job descriptions
         self.id = None
         self.runtag = runtag
         # "obsseq" (the date and time at which the OB was sent to TAROS),
         # isn't yet available as a keyword, so grep the filename.
         self.obsseq = get_obsseq (self.basefname)
+        self.obsid  = get_obsid (self.basefname)
         # RS 2012/08/30:  Add Skybot cache name for this pointing.
         self.skybot_cachefname = "{0}/{1}/skybot_{2}.txt".format(
                 PipelinePath.skybot, self.field, datetime2str(self.dateobs))
         self.sdss_cachefname = "{0}/{1}/sdss_{1}.txt".format(
                 PipelinePath.sdss, self.field)
+        # FY 2015/08/03: Add skymapper observation type
+        
 
 
 class FilenamesFlat(Filenames):
@@ -290,10 +325,10 @@ class FilenamesFlat(Filenames):
         #if not os.path.exists("{0}/{1}".format(self.absolute_dir,filename)):
         #    self.basedir = PipelinePath.new
         #    self.absolute_dir = "{0}/{1}".format(self.basedir, self.relative_dir)
-        self.flatfname = "flat_{0}_{1}_{2}.fits".format(
-                self.obsseq, self.filter, self.ccd)
-        self.wtmapfname = "weightmap_{0}_{1}_{2}.fits".format(
-                self.obsseq, self.filter, self.ccd)
+        self.flatfname = "flat_{0}_{1}_{2}_{3}.fits".format(
+                self.obsid, self.obsseq, self.filter, self.ccd)
+        self.wtmapfname = "weightmap_{0}_{1}_{2}_{3}.fits".format(
+                self.obsid, self.obsseq, self.filter, self.ccd)
         self.log_file_name = self.flatfname.replace(".fits",".log")
         self.absfname = "{0}/{1}".format(self.absolute_dir, self.basefname)
 
@@ -334,21 +369,36 @@ class FilenamesNew(Filenames):
 class FilenamesRef(Filenames):
     """Filenames subclass for SkyMapper galaxy reference images"""
 
-    subnameregex = "ref(\d+_\d+)_([^_]+)_([uvgriz])_([^_]+)_(\d+)"
-    subnamegroup = ["runtag", "field", "filter", "obsseq", "subfield"]
+    # FY - 2015/10/01: adding obsid, because obsseq is not unique.
+    subnameregex = "ref(\d+_\d+)_([^_]+)_([uvgriz])_(\d+)_([^_]+)_(\d+)"
+    subnamegroup = ["runtag", "field", "filter", "obsid","obsseq", "subfield"]
+    subnameregex0 = "ref(\d+_\d+)_([^_]+)_([uvgriz])_([^_]+)_(\d+)"
+    subnamegroup0 = ["runtag", "field", "filter", "obsseq", "subfield"]
 
     def __init__(self, filename, runtag="",subid=None):
         if subid:
             # If instead we're given a job ID
             match = re.match(self.subnameregex, subid)
             if not match:
-                raise TrackableException("Bad 'subid' input to FilenamesRef")
-            self.basefname = ''
-            self.runtag = match.group(1)
-            self.field = int(match.group(2))
-            self.filter = match.group(3)
-            self.obsseq = match.group(4)
-            self.subfield = int(match.group(5))
+                match = re.match(self.subnameregex0, subid)
+                if match:
+                    self.basefname = ''
+                    self.runtag = match.group(1)
+                    self.field = int(match.group(2))
+                    self.filter = match.group(3)
+                    self.obsid = None
+                    self.obsseq = match.group(4)
+                    self.subfield = int(match.group(5))
+                else:
+                    raise TrackableException("Bad 'subid' input to FilenamesRef")
+            else:
+                self.basefname = ''
+                self.runtag = match.group(1)
+                self.field = int(match.group(2))
+                self.filter = match.group(3)
+                self.obsid = match.group(4)
+                self.obsseq = match.group(5)
+                self.subfield = int(match.group(6))
         else:
             super(FilenamesRef, self).__init__(filename, runtag=runtag)
         self.basedir = PipelinePath.ref
@@ -356,8 +406,8 @@ class FilenamesRef(Filenames):
                 self.field, self.filter, self.subfield)
         self.absolute_dir = "{0}/{1}".format(self.basedir, self.relative_dir)
         self.absfname = "{0}/{1}".format(self.absolute_dir, self.basefname)
-        self.id = "ref{0}_{1:04d}_{2}_{3}_{4:02d}".format(self.runtag,
-                self.field, self.filter, self.obsseq, self.subfield)
+        self.id = "ref{0}_{1:04d}_{2}_{3}_{4}_{5:02d}".format(self.runtag,
+                self.field, self.filter, self.obsid, self.obsseq, self.subfield)
         self.workdir = "{0}/{1}".format(PipelinePath.scratch, self.id)
         self.log_file_name = self.id + ".log"
 
@@ -365,15 +415,22 @@ class FilenamesRef(Filenames):
 class FilenamesSub(Filenames):
     """Filenames subclass for SkyMapper subtraction images"""
 
-    subnameregex = "sub(\d+_\d+)_([^_]+)_([uvgriz])_([^_]+)_(\d+)"
-    subnamegroup = ["runtag", "field", "filter", "obsseq", "subfield"]
+    # FY - 2015/10/01: adding obsid, because obsseq is not unique.
+    subnameregex = "sub(\d+_\d+)_([^_]+)_([uvgriz])_(\d+)_([^_]+)_(\d+)"
+    subnamegroup = ["runtag", "field", "filter", "obsid", "obsseq", "subfield"]
+    subnameregex0 = "sub(\d+_\d+)_([^_]+)_([uvgriz])_([^_]+)_(\d+)"
+    subnamegroup0 = ["runtag", "field", "filter", "obsseq", "subfield"]
 
     @staticmethod
-    def subid_from_fields(runtag, field, filter, obsseq, subfield):
+    def subid_from_fields(runtag, field, filter, obsseq, subfield,obsid=None):
        """For convenience in guessing subids"""
+       if obsid:
+           if obsid!='None':
+               return "sub{0}_{1:04d}_{2}_{3}_{4}_{5:02d}".format(
+                   runtag, field, filter, obsid, obsseq, subfield)
        return "sub{0}_{1:04d}_{2}_{3}_{4:02d}".format(
-               runtag, field, filter, obsseq, subfield)
-
+           runtag, field, filter, obsseq, subfield)
+       
     def __init__(self, new=None, runtag=None, subid=None):
         """NB:  you can initialize SUB info from a Filenames instance"""
         if new:
@@ -385,6 +442,7 @@ class FilenamesSub(Filenames):
                 self.filter = new.filter
                 self.ccd = new.ccd
                 self.subfield = new.subfield
+                self.obsid = new.obsid
                 self.obsseq = new.obsseq
                 if hasattr(new, 'imgtype'):   self.imgtype = new.imgtype
                 if hasattr(new, 'airmass'):   self.airmass = new.airmass
@@ -396,18 +454,28 @@ class FilenamesSub(Filenames):
                 if hasattr(new, 'elong'):     self.elong = new.elong
                 if hasattr(new, 'elongwid'):  self.elongwid = new.elongwid
                 if hasattr(new, 'zpmag'):     self.zpmag = new.zpmag
+                if hasattr(new, 'bkgmed'):    self.bkgmed = new.bkgmed
                 if hasattr(new, 'bkgsig'):    self.bkgsig = new.bkgsig
+                if hasattr(new, 'maglim50'):  self.maglim50=new.maglim50
+                if hasattr(new, 'maglim95'):  self.maglim95=new.maglim95
+                if hasattr(new, 'minra'):     self.minra=new.minra
+                if hasattr(new,'maxra'):     self.maxra=new.maxra
+                if hasattr(new,'mindec'):     self.mindec=new.mindec
+                if hasattr(new,'maxdec'):     self.maxdec=new.maxdec
                 if hasattr(new, 'skybot_cachefname'):
                     self.skybot_cachefname = new.skybot_cachefname
                 if hasattr(new, 'sdss_cachefname'):
                     self.sdss_cachefname = new.sdss_cachefname
+                if hasattr(new, 'program'):
+                    self.program = new.program
             elif isinstance(new, str):
                 # If it's just a string filename, see if it's a SUB filename;
                 # if so, reroute to "subid" since filename = subid + ".fits".
                 # Yes, this amounts to parsing the filename, which is evil...
                 # but at least the filename convention is here in this class.
                 match = re.match(self.subnameregex, new)
-                if match:
+                match0= re.match(self.subnameregex0, new)
+                if match or match0:
                     self.__init__(subid=new.replace('.fits',''))
                     return
                 # Otherwise, call again and construct Filenames instance
@@ -420,7 +488,7 @@ class FilenamesSub(Filenames):
             if runtag:  self.runtag = runtag
             else:  raise TrackableException("Can't find runtag in input")
             self.id = FilenamesSub.subid_from_fields(self.runtag,
-                    self.field, self.filter, self.obsseq, self.subfield)
+                    self.field, self.filter, self.obsseq, self.subfield,self.obsid)
         elif subid:
             # If instead we're given a subtraction ID, parse what we can.
             # The regex below is based on the self.id format seen above.
@@ -429,13 +497,25 @@ class FilenamesSub(Filenames):
             # the airmass, exptime, etc. attributes defined.
             match = re.search(self.subnameregex, subid)
             if not match:
-                raise TrackableException("Bad 'subid' input to FilenamesSub")
-            self.basefname = ''
-            self.runtag = match.group(1)
-            self.field = int(match.group(2))
-            self.filter = match.group(3)
-            self.obsseq = match.group(4)
-            self.subfield = int(match.group(5))
+                match=re.search(self.subnameregex0, subid)
+                if match:
+                    self.basefname = ''
+                    self.runtag = match.group(1)
+                    self.field = int(match.group(2))
+                    self.filter = match.group(3)
+                    self.obsid  = None
+                    self.obsseq = match.group(4)
+                    self.subfield = int(match.group(5))
+                else:
+                    raise TrackableException("Bad 'subid' input to FilenamesSub")
+            else:
+                self.basefname = ''
+                self.runtag = match.group(1)
+                self.field = int(match.group(2))
+                self.filter = match.group(3)
+                self.obsid  = match.group(4)
+                self.obsseq = match.group(5)
+                self.subfield = int(match.group(6))
             self.ccd = 0
             self.id = subid
             self.airmass = 1.0
@@ -443,6 +523,7 @@ class FilenamesSub(Filenames):
             self.dateobs = None
             self.seeing, self.seewid = 99.9, 99.9
             self.elong, self.elongwid = 99.9, 99.9
+            self.program=''
         else:
             raise TrackableException("Missing parameters in FilenamesSub")
 
@@ -531,7 +612,8 @@ class FilenamesXsient(object):
         self.thumb_dir = ThumbNames.thumb_dir(self.name)
         self.finderfname = "{0}/{1}_fchart.png".format(
                 PipelinePath.finderpath, self.name)
-
+        self.basexrefname = "{0:04d}_{1}_xref.fits".format(int(field), int(subfield))
+        self.absxrefname = "{0}/{1}/{2}".format(PipelinePath.xref,self.relative_dir,self.basexrefname)
 
 def Find_Image_Set(subid,localonly=False):
     """find new, ref and sub"""
@@ -549,7 +631,7 @@ def Find_Image_Set(subid,localonly=False):
         islocal = False
         subfile = fits_exists(subnames.absolute_dir + "/" + subfname)
         if not subfile:
-            print "Missing sub image:",subfile
+            print "Missing sub image:",subnames.absolute_dir,subfname
             return None
     
     subhead = pyfits.getheader(subfile)
@@ -566,10 +648,10 @@ def Find_Image_Set(subid,localonly=False):
                                   
         reffile = fits_exists(subnames.absolute_dir + "/" + reffname)
         if not newfile:
-            print "Missing new image:",newfile
+            print "Missing new image:",newfname
             return None
         if not reffile:
-            print "Missing ref image:",reffile
+            print "Missing ref image:",reffname
             return None
     
     imnames={"newname":newfile,"refname":reffile,"subname":subfile}
@@ -607,23 +689,33 @@ class SkymapperFieldCenter(AsciiRecord, CatalogEntry):
 
     def __init__(self, *args, **kwargs):
         """ScheduleField constructor"""
-        # First initialize as a SkymapperFieldCenter
-        super(SkymapperFieldCenter, self).__init__(*args, **kwargs)
-        # Then set the exposure time
-        filters, exptime = [ ], { }
-        for filtinfo in self.exp.split(","):
-            filt, xpt = filtinfo.split(":")
-            filters.append(filt)
-            exptime[filt] = float(xpt)
-        self.filters = filters
-        self.exptime = exptime
+        # Initialize from an object
+        if 'dict' in kwargs:
+            self.__dict__ = kwargs['dict'].__dict__.copy()
+        else:
+            # First initialize as a SkymapperFieldCenter
+            super(SkymapperFieldCenter, self).__init__(*args, **kwargs)
+            # Set cadence and date last observed to default values
+        if not hasattr(self,'cadence'): self.set_cadence()
+        if not hasattr(self,'last_observed'): self.last_observed = 0.0
+        if not hasattr(self,'pmult'): self.pmult = 1.0
+        if hasattr(self,'exp') and (not hasattr(self,'filters') or not hasattr(self,'exptime')):
+            # Then set the exposure time
+            filters, exptime = [ ], { }
+            for filtinfo in self.exp.split(","):
+                filt, xpt = filtinfo.split(":")
+                if not filt in filters:filters.append(filt)
+                if filt in exptime:
+                    exptime[filt].append(float(xpt))
+                else:
+                    exptime[filt]=[float(xpt)]
+            self.filters = filters
+            self.exptime = exptime
         # How long will this observation take, including overhead?
-        self.obs_length = sum([exptime[f] + Imager.overhead
-                               for f in filters]) * ephem.second
-        # Set cadence and date last observed to default values
-        self.set_cadence()
-        self.last_observed = 0.0
-
+        if not hasattr(self,'obs_length'):
+            self.obs_length = sum([et + Imager.overhead
+                                   for f in self.filters for et in self.exptime[f]]) * ephem.second
+ 
     def init_ephem_body(self):
         """Sets a pyephem body at the coordinates of the field center
         
@@ -656,45 +748,53 @@ class SkymapperFieldCenter(AsciiRecord, CatalogEntry):
         """Set the date on which the field was last observed."""
         self.last_observed = 1.0*date
 
-    def calc_priority(self, date, verbose=False):
+    def calc_priority(self, date, verbose=False, min_alt=Imager.min_alt):
         """Assigns a scheduling priority to a field
 
         Priority is based on the time of observing and the parameters of the
         survey (cadence etc.).  0 = lowest, 100 = highest.
+
+        RS 2015/07/13:  Remove vibrations and reference-cadence constraints,
+        since these aren't really relevant when running w/multiple queues.
+        Also, since the cost function is discrete like a decision tree,
+        change fancy exp() factors to simple if-thens to reflect this.
         """
 
         # Baseline priority is to observe it (100).  Everything else whittles
         # away to *keep* us from observing bad targets.
-        priority = 100
+        # RS 2015/07/13:  Add "pmult" factor to account for queue-dependent
+        # things SkymapperFieldCenter doesn't necessarily need to know about.
+        self.priority = 100*self.pmult
         # annoying reassigns because ephem.Observer() is impervious to copy
         site = ephem.Observer()
         site.lat, site.lon, site.horizon = sso.lat, sso.lon, sso.horizon
         site.date = date
         # ok carry on
         self.body.compute(site)
-        self.alt = self.body.alt*180/ephem.pi
+        self.az, self.alt = self.body.az, self.body.alt
         dt = site.date - self.last_observed
-        if verbose:  print "# >>> priority = {:.1f}".format(priority),
+        if verbose:
+            print "# >>> priority = {:.1f}".format(self.priority),
         # Is the field above the horizon (or a reasonable airmass)?
-        priority /= (1.0 + np.exp( (Imager.min_alt - self.alt)/1.0))
-        # Is the field in a part of the sky where the vibrations aren't too
-        # bad?
-        priority /= (1.0 + np.exp(-(Imager.max_alt - self.alt)/3.0))
-        if verbose:  print "# >> {:.1f} (airmass)".format(priority),
-        # Are we keeping close to the cadence we want?
-        priority /= (1.0 + np.exp((self.cadence-dt)/self.cwidth))
-        if verbose:  print "# >> {:.1f} (cadence)".format(priority),
-        # Slightly downgrade fields that haven't been observed in months.
-        # This has been tuned to let a few new fields in each night,
-        # gradually.  (Don't penalize high-cadence follow-up fields.)
-        if self.cadence > 2.0:
-            priority *= (1.0 - 0.45/(1.0 + np.exp((60.0-dt)/15.0)))
-        if verbose:  print "# >> {:.1f} (refcache)".format(priority)
-        # (advanced:)  What is the expected point-source depth for this field?
-        # print "field", self.id, "last observed", ephem.Date(self.last_observed).datetime()
-
-        self.priority = priority
-        return priority
+        if np.degrees(self.alt) < min_alt:
+            self.priority = 0.0
+            if verbose:
+                print "# >> priority = {0:.1f} (airmass, alt:{1:.1f}) ".format(self.priority,np.degrees(self.alt)),
+        # Are we too early?
+        if dt < self.cadence:
+            self.priority = 0.0
+            if verbose:
+                print "# >> priority = {0:.1f} (cadence too small, dt:{1:.1f}) ".format(self.priority,dt),
+        # Bump priority up if the field is badly overdue
+        if dt > 1.5*self.cadence and dt < 30.0: #but not if it's way too overdue...
+            self.priority *= 2.0
+            if verbose: 
+                print "# >> {:.1f} (deadman) ".format(self.priority)
+        # Account for any extraneous priority multipliers
+        if verbose:
+            print "# >> {:.1f}".format(self.priority)
+        # Return final value
+        return self.priority
 
 
 SMfield_list = SkymapperFieldCenter.read_ascii_file(
@@ -766,6 +866,7 @@ class SchedulerLogEntry(CatalogEntry):
         # default for if something fails
         self.obsdate = None
         self.obsseq = None
+        self.program = None
         self.obsid = None
         self.imgid = None
         self.filter = None
@@ -775,7 +876,7 @@ class SchedulerLogEntry(CatalogEntry):
         self.ra_str, self.dec_str = "", ""
 
         # here's the line with what the scheduler told TAROS to do
-        mm = re.search("(\S+ \S+) .*Ob: 3PS; id (\d+); .* filter (.); rot (\d+);"
+        mm = re.search("(\S+ \S+) .*Ob: (3PS|BAD); id (\d+); .* filter (.); rot (\d+);"
                        ".*RA/dec. (\S+) / (\S+) \((\S+) / (\S+)\)", logline)
         if mm is None:  return
     
@@ -784,12 +885,13 @@ class SchedulerLogEntry(CatalogEntry):
         strdate = mm.group(1)[:19].replace('-','/')
         self.obsdate = ephem.Date(strdate)
         self.obsseq = strdate.replace(' ','T')
-        self.obsid = int(mm.group(2))
+        self.program = mm.group(2)
+        self.obsid = int(mm.group(3))
         self.imgid = "{0}_{1}".format(self.obsid, self.obsseq[:-3])
-        self.filter = mm.group(3).strip()
-        self.rotskypa = float(mm.group(4))
-        self.ra = ephem.hours(mm.group(5))
-        self.dec = ephem.degrees(mm.group(6))
+        self.filter = mm.group(4).strip()
+        self.rotskypa = float(mm.group(5))
+        self.ra = ephem.hours(mm.group(6))
+        self.dec = ephem.degrees(mm.group(7))
         ra_str, dec_str = str(self.ra), str(self.dec)
         self.ra *= 180/ephem.pi
         self.dec *= 180/ephem.pi
@@ -805,3 +907,62 @@ class SchedulerLogEntry(CatalogEntry):
             dec_groups[1] = abs(dec_groups[1])
         dec = "{0}{1:02.0f}:{2:02.0f}:{3:02.0f}".format(*dec_groups)
         self.ra_str, self.dec_str = ra_str, dec_str
+
+
+# ----------------------------------------------------------------------------
+#                         Skymapper observation id 
+# ----------------------------------------------------------------------------
+
+ID_SEQ_NO_BITS   =  9 
+ID_OB_SEQ_BITS   =  5 
+ID_DR_SER_BITS   =  1 
+ID_FIELD_ID_BITS = 13 
+ID_OB_TYPE_BITS  =  4 
+ID_LOW_BITS = ( ID_SEQ_NO_BITS + ID_OB_SEQ_BITS + ID_DR_SER_BITS +
+                ID_FIELD_ID_BITS )
+
+TID_SEQ_NO_BITS    =  9 
+TID_OBSID_BITS     = 12 
+TID_SURVEY_ID_BITS =  7 
+TID_OB_TYPE_BITS   =  4
+
+OBSERVATION_TYPE = {"MS":1,
+                    "TFF":2,
+                    "3PS":3,
+                    "STD":4,
+                    "5SS":5,
+                    "BAD":6,
+                    "BIAS":7}
+
+def get_ob_name(ob_type):
+    ob_name=''
+    for key, value in OBSERVATION_TYPE.iteritems():
+        if value==ob_type:
+            ob_name=key
+            break
+    return ob_name
+
+def decode_obs_id(encoded_ids):
+    encoded_ids=int(encoded_ids)
+    if  (( encoded_ids >> ID_LOW_BITS ) & ( 2 ** ID_OB_TYPE_BITS - 1 )==OBSERVATION_TYPE["3PS"]  
+         or (encoded_ids >> ID_LOW_BITS ) & ( 2 ** ID_OB_TYPE_BITS - 1 )==OBSERVATION_TYPE["BAD"]):   
+        seq_no_3PS = encoded_ids & ( 2 ** TID_SEQ_NO_BITS   - 1 )   # Get sequence number
+        encoded_ids >>= TID_SEQ_NO_BITS    
+        obsid = encoded_ids & ( 2 ** TID_OBSID_BITS   - 1 )   # Get obsid number
+        encoded_ids >>= TID_OBSID_BITS
+        survey_id = encoded_ids & ( 2 ** TID_SURVEY_ID_BITS - 1 )   # Get survey number
+        encoded_ids >>= TID_SURVEY_ID_BITS 
+        ob_type  = encoded_ids & ( 2 ** TID_OB_TYPE_BITS  - 1 )   # Get observation type
+        return get_ob_name(ob_type), survey_id, obsid, seq_no_3PS
+    else:
+        encoded_ids >>= ID_SEQ_NO_BITS                                # Scrap observation id sequence number
+        ob_seq_no = encoded_ids & ( 2 ** ID_OB_SEQ_BITS   - 1 )   # Get sequence (filter) number
+        encoded_ids >>= ID_OB_SEQ_BITS         
+        dr_ser_no = encoded_ids & ( 2 ** ID_DR_SER_BITS   - 1 )   # Get data release or series number
+        encoded_ids >>= ID_DR_SER_BITS        
+        field_id  = encoded_ids & ( 2 ** ID_FIELD_ID_BITS - 1 )   # Get field id
+        encoded_ids >>= ID_FIELD_ID_BITS         
+        ob_type   = encoded_ids & ( 2 ** ID_OB_TYPE_BITS  - 1 )   # Get observation type
+        return get_ob_name(ob_type), field_id, dr_ser_no, ob_seq_no
+
+# ----------------------------------------------------------------------------

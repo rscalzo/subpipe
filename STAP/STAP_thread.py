@@ -84,9 +84,9 @@ class STAP_thread(Pipeline.Workflow):
             lcfnames += fnames
             self._copy_over += [srcpath + "/" + fn for fn in fnames]
         lcfnames.append(lsubstars)
-        glob_xsient= Constants.FilenamesXsient(
-                "*", subnames.field, subnames.ccd)
-        self._copy_over += [fn for fn in glob.glob(glob_xsient.abshistfname)]
+        #glob_xsient= Constants.FilenamesXsient(
+        #        "*", subnames.field, subnames.ccd)
+        #self._copy_over += [fn for fn in glob.glob(glob_xsient.abshistfname)]
 
         # List of pipeline stages to execute
         self._stagelist = \
@@ -117,7 +117,7 @@ class STAP_thread(Pipeline.Workflow):
         	{ "candsfnames": [subcands], "lcfnames": lcfnames,
                	"skybot_cachefname": skybotfn, "sdss_cachefname": sdssfn,
 		"replace": True }],
-            ["makethumbs",   STAP.makethumbs,[[],]],
+            ["makethumbs",   STAP.makethumbs,[[],lxrefcat,]],
         ]
 
     def _cleanup_workflow(self):
@@ -161,8 +161,8 @@ class STAP_thread(Pipeline.Workflow):
                         xdict["name"], xdict["field"], xdict["subfield"])
                 print "Copying back", xsientnames.abssublcfname
                 self._copy_back.append(xsientnames.abssublcfname)
-                print "Copying back", xsientnames.abshistfname
-                self._copy_back.append(xsientnames.abshistfname)
+                #print "Copying back", xsientnames.abshistfname
+                #self._copy_back.append(xsientnames.abshistfname)
                 #find thumbnails
                 thumbs=glob.glob("*{0}*.png".format(xsientnames.name))
                 for thumb in thumbs:

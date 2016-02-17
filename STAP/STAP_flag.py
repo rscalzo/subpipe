@@ -172,6 +172,15 @@ def classify_randomforest(newname, refname, subname,
         if not ((minx <= s.x < maxx) or (miny <= s.y < maxy)):
             continue
 
+        # FY 2015/07/15: ignore if the fwhm is significantly larger or smaller than median
+        minfwhmratio=0.5
+        maxfwhmratio=2.0
+        maxeratio=2.
+        if s.fwhm/newfwhm<minfwhmratio or s.fwhm/newfwhm>maxfwhmratio:
+            continue
+        if s.e/medenew>maxeratio:
+            continue
+
         # Look for a nearest neighbor in the REF.
         # RS 2011/10/26:  We expect these to be associated with host galaxies,
         # or possibly with bright stars which might be poorly subtracted.

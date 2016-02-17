@@ -17,7 +17,7 @@ import ephem
 import pyfits
 import numpy as np
 import datetime
-from Record import AsciiRecord, KeywordRecord, FITSRecord, PGRecord, BadInit
+from Utils.Record import AsciiRecord, KeywordRecord, FITSRecord, PGRecord, BadInit
 
 
 class CatalogEntry(object):
@@ -784,7 +784,7 @@ class SkymapperCalibStar(FITSRecord, KeywordRecord, CatalogEntry):
 
 class APASSObject(PGRecord, SkymapperCalibStar):
     """
-    Represents a record from the APASS DR6 hosted via the Postgres catalog
+    Represents a record from the APASS DR7 hosted via the Postgres catalog
     Simon has recently set up on martini (2012/06/20).  Uses PGrecord.
     """
 
@@ -823,3 +823,109 @@ class APASSObject(PGRecord, SkymapperCalibStar):
         # it might not be completely horrible.  Let's see what happens.
         self.v, self.v_err = self.g, self.g_err
         self.vzpc, self.vzpc_err = self.gzpc, self.gzpc_err
+
+
+
+# Extinction terms, required for doing color transformation correctly
+A_band = {'u_SM':4.329, 'v_SM':4.026, 'g_SM':2.986, 'r_SM':2.288, 'i_SM':1.588, 'z_SM':1.206, 'Ha_SM':2.1,
+	'g_sdss':3.292, 'r_sdss':2.274, 'i_sdss':1.688}
+
+# For APASS, filters r, Ha, i & z have color terms determined in red-minus-blue fashion
+#  Values determined by C.Wolf from synthetic photometry of Pickles (1998) models, without dust
+#  Note: zpshift not yet defined for H-alpha
+ZPcalib={
+	'u':{ 'zpshift':0.623, 'color':1.852, 'gmrlimit':[1.0,0.25] },
+	'v':{ 'zpshift':0.143, 'color':1.986, 'gmrlimit':[1.0,0.25] },
+	'g':{ 'zpshift':-0.017, 'color':-0.339, 'gmrlimit':[1.0,0.25] },
+	'r':{ 'zpshift':-0.001, 'color':0.019, 'gmrlimit':[1.0,0.0] },
+	'Ha':{ 'zpshift':0.000, 'color':-0.2,  'gmrlimit':[1.3,0.3] },
+	'i':{ 'zpshift':0.009, 'color':-0.163, 'gmrlimit':[1.0,0.0] },
+	'z':{ 'zpshift':0.065, 'color':-0.765, 'gmrlimit':[1.0,0.0] },
+	'rmilimit':[0.5,-0.1]
+	}
+
+
+class APASSSMObject(PGRecord, SkymapperCalibStar):
+    """
+    Represents a record from the APASS DR7 hosted via the Postgres catalog
+    Simon has recently set up on martini (2012/06/20).  Uses PGrecord.
+    FY - added color transformation to SM filters.
+    FY - catalog moved to maipenrai
+    """
+    _nodata = SkymapperCalibStar._nodata
+    _dbname = 'catalogs'
+    _dbhost = '' #localhost'
+    _dbuser = 'untrusted'
+    _dbpw = 'trustno1'
+    _sqlquery = "SELECT * FROM apass_dr7_twomass WHERE " \
+                "q3c_radial_query(ra, decl, %s, %s, %s)"
+
+    
+    _sql_fields = \
+    [
+        [ "ra", "ra", None ], [ "dec",   "decl", None ],
+        [ "g_sdss",  "g", 15.00 ], [ "g_sdss_err", "e_g", _nodata ],
+        [ "r_sdss",  "r", 15.00 ], [ "r_sdss_err", "e_r", _nodata ],
+        [ "i_sdss",  "i", 15.00 ], [ "i_sdss_err", "e_i", _nodata ],
+        [ "ebmv", "ebmv_sfd",0.0],
+        ]
+
+    def __init__(self, *args, **kwargs):
+        """
+        Try to init in this order:  from a FITS table row (2 arguments);
+        then override with SQL and keywords.
+        """
+        if len(args) == 2:
+            self._init_from_fitsrow(*args)
+        if len(kwargs) > 0:
+            self._init_from_sqlrow(**kwargs)
+            self._init_from_keywords(**kwargs)
+
+        # Here's where the transformation is done
+        # correct for extinction
+        if hasattr(self,'ebmv'):
+            ebmv=self.ebmv
+        else:
+            ebmv=calc_ebmv([self.ra],[self.dec],interp=False)[0]
+	# extinction in APASS and SM bands
+        Ag_sdss,Ar_sdss,Ai_sdss=ebmv*A_band['g_sdss'],ebmv*A_band['r_sdss'],ebmv*A_band['i_sdss']
+        Au,Av,Ag,Ar,Ai,Az=ebmv*A_band['u_SM'],ebmv*A_band['v_SM'],ebmv*A_band['g_SM'],ebmv*A_band['r_SM'],ebmv*A_band['i_SM'],ebmv*A_band['z_SM']
+        # observed color
+        if np.any(np.array([self.g_sdss_err,self.r_sdss_err,self.i_sdss_err])>=9.9):
+            gmr0,rmi0=99.9,99.9
+            gmr0_err,rmi0_err=99.9,99.9
+        else:
+            gmr0,rmi0 = (self.g_sdss-Ag_sdss)-(self.r_sdss-Ar_sdss),(self.r_sdss-Ar_sdss)-(self.i_sdss-Ai_sdss)
+            gmr0_err = (self.g_sdss_err**2+self.r_sdss_err**2)**0.5
+            rmi0_err = (self.i_sdss_err**2+self.r_sdss_err**2)**0.5
+	# color transformation only applicable for certain stars
+	for filtname in self._filters:
+            if gmr0>=ZPcalib[filtname]['gmrlimit'][1] and gmr0<=ZPcalib[filtname]['gmrlimit'][0] and rmi0>=ZPcalib['rmilimit'][1] and rmi0<=ZPcalib['rmilimit'][0]:
+	        if filtname=='u':
+		    mag1,color0 = self.g_sdss-Ag_sdss+Au, gmr0
+                    magerr, colorerr=self.g_sdss_err, gmr0_err
+		if filtname=='v':
+		    mag1,color0 = self.g_sdss-Ag_sdss+Av, gmr0
+                    magerr, colorerr=self.g_sdss_err, gmr0_err
+		if filtname=='g':
+		    mag1,color0 = self.g_sdss-Ag_sdss+Ag, gmr0
+                    magerr, colorerr=self.g_sdss_err, gmr0_err
+		if filtname=='r':
+		    mag1,color0 = self.r_sdss-Ar_sdss+Ar, gmr0
+                    magerr, colorerr=self.r_sdss_err, gmr0_err
+		if filtname=='i':
+		    mag1,color0 = self.i_sdss-Ai_sdss+Ai, rmi0
+                    magerr, colorerr=self.i_sdss_err, rmi0_err
+		if filtname=='z':
+		    mag1,color0 = self.i_sdss-Ai_sdss+Az, rmi0
+                    magerr, colorerr=self.i_sdss_err, rmi0_err
+	
+                catfiltmag = mag1 + ZPcalib[filtname]['color']*color0+ZPcalib[filtname]['zpshift']
+                catfiltmagerr= (magerr**2+np.abs(ZPcalib[filtname]['color'])*colorerr**2)**0.5
+		setattr(self,filtname,catfiltmag)
+		setattr(self,filtname+'_err',catfiltmagerr)
+            else:
+                setattr(self,filtname, self._nodata)
+                setattr(self,filtname+'_err',self._nodata)
+
+        self._calc_zpcolors()

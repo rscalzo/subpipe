@@ -23,12 +23,16 @@ import threading
 import traceback
 from STAP_comm import STAP_callexternal, psmemchk
 from Utils import Pipeline as Pipeline
-from Utils.Constants import PipelinePath as CPP, get_runtag, Imager
+from Utils.Constants import PipelinePath as CPP, get_runtag, Imager, decode_obs_id
 from Utils.Constants import SMfield_lookup, Filenames, FilenamesNew, FilenamesNewflat
 from Utils.TrackableException import TrackableException as IngestFail
 # from mydjango.jobstats.STAP_API import register_job, register_run
 def register_job(*args):  pass
 def register_run(*args):  pass
+from mydjango.jobstats.STAP_API import register_pointing,register_image
+import mydjango.jobstats.models as js
+#only when miner is down
+#def register_pointing(*args):  pass
 
 #define home, raw, new and cal path
 # RS:  We need these to function down there.
@@ -82,8 +86,12 @@ def main():
             help="keep the contents of /ramdisk/workdir for debugging?")
     parser.add_argument('--production', action='store_true', default=False,
             help="run in production mode, importing from current UT date?")
+    parser.add_argument('--obstype', default='MS_*|TFF_*|3PS_42|BAD_42',
+            help="only retrieve images with specified observation type and survey id") 
     parser.add_argument('--imageid', default='53|89|805|053|089|169',
             help="only retrieve images with specified imageid") 
+    parser.add_argument('--checkdb', action='store_true', default=False,
+                        help="check database for already ingested files")
     args = parser.parse_args()
     print "Using pyfits version", pyfits.__version__
 
@@ -128,8 +136,11 @@ def main():
     if args.local:
         print "remotepath =", remotepath
         myfiles = glob.glob(remotepath + "/Skymapper*.fits")
-        matchlist = [re.search("(\d{4}-\d{2}-\d{2})", fn) for fn in myfiles]
-        datelist = set([m.group(1) for m in matchlist if m])
+        matchlist1 = [re.search("(\d{4}-\d{2}-\d{2})T[12]", fn) for fn in myfiles]
+        matchlist2 = [re.search("(\d{4}-\d{2}-\d{2})T0", fn) for fn in myfiles]
+        datelist1 = set([m.group(1) for m in matchlist1 if m])
+        datelist2 = set([(datetime.datetime.strptime(m.group(1),'%Y-%m-%d')-datetime.timedelta(days=1)).strftime('%Y-%m-%d') for m in matchlist2 if m])
+        datelist=set(list(datelist1)+list(datelist2))
         print "myfiles = ", myfiles
         print "Fetching logs from", datelist
         schedule_log_list = [ ]
@@ -145,13 +156,14 @@ def main():
     if status != 0:
         print "STAP_ingest.py:  Couldn't fetch schedule logs!"
         sys.stdout.flush()
-        return -1
-    for logfile in schedule_log_list:
-        if os.path.exists(logfile) and re.search(today_utc, logfile):
-            print "Updating manifest from", logfile
+        #return -1
+    else:
+        for logfile in schedule_log_list:
+            if os.path.exists(logfile) and re.search(today_utc, logfile):
+                print "Updating manifest from", logfile
             # manifest.update(manifest_from_scheduler_log(logfile))
-            manifest = manifest_from_scheduler_log(logfile, manifest)
-            sys.stdout.flush()
+                manifest = manifest_from_scheduler_log(logfile, manifest)
+                sys.stdout.flush()
 
     remotefnames = [ None ]
     idle = False
@@ -184,7 +196,7 @@ def main():
         # RS:  See which new files have appeared on the "remote" system.
         # If this fails for some reason, print an error message and wait
         # for a while for the user to notice and/or fix something.
-        status, remotefnames = ls_remote(acct, remotepath, imageid=args.imageid)
+        status, remotefnames = ls_remote(acct, remotepath, obstype=args.obstype, imageid=args.imageid)
         if status != 0:
             print "STAP_ingest.py:  remote ls failed"
             print "Waiting 30 minutes and hoping problem is resolved."
@@ -192,7 +204,19 @@ def main():
             time.sleep(1800)
             continue
 
+        #just do those not yet in database
+        if args.checkdb:
+            fnames=[fname.split('/')[-1].split('.')[0] for fname in remotefnames]
+            spnames=list(js.SciencePointing.objects.filter(filename__in=fnames).values_list('filename',flat=True))
+            for fname in remotefnames:
+                if fname.split('/')[-1].split('.')[0] in spnames:
+                    donefnames.append(fname)
+
+        print "Found {0} new files on remote host".format(len(remotefnames))
         remotefnames = [fn for fn in remotefnames if fn not in donefnames]
+        print "working on %s remote files"%len(remotefnames)
+        print remotefnames
+
         if not idle: # or len(remotefnames) > 0:
             print "STAP_ingest.py:  running main loop at local time ",
             print time.asctime(time.localtime(start_loop_time))
@@ -262,7 +286,15 @@ def main():
 
             wf = Qsplit.finish_job()
             job_out = wf.output
-
+            # FY - add status code
+            if "exception" in job_out["stages"][-1]:
+                exit_status = js.PipelineExitStatus.objects.get_or_create(
+                    description=job_out["stages"][-1]["exception"],
+                    stage_fail=job_out["stages"][-1]["name"])[0]
+            else:
+                exit_status = js.PipelineExitStatus.objects.get_or_create(
+                    description="Success")[0]
+            
             # Register the job under some job name so we can track what
             # happened to each field that's ingested.
             bfn = job_out["name"]
@@ -296,10 +328,23 @@ def main():
             # database of jobs so we can look at it again later.
             try:
                 meta = Filenames(lfn, runtag=runtag)
-                meta.field = field
+                meta.field = field  #intended or actual
                 job_out["name"] = id
                 print "Registering image {0} under job {1}".format(bfn, id)
-                register_job(meta, job_out)
+                newpt=register_pointing(meta,proc_status=exit_status)
+                #FY - also register images that actually get copied back
+                # only if job successful
+                if not "exception" in job_out["stages"][-1] and newpt:
+                    for ccd in range(1,33):
+                        newname=FilenamesNew.absolute_dir(newpt.field.id,newpt.filter,ccd)+'/'+newpt.filename+'_%d.fits'%ccd
+                        if os.path.exists(newname):
+                            names=FilenamesNew(newname)
+                            if ccd==17:
+                                image=register_image(names,pointing=newpt,updatepointing=True)
+                            else:
+                                image=register_image(names,pointing=newpt,updatepointing=False)
+                #not actually registering jobs at the moment
+                #register_job(meta, job_out)
             except Exception as e:
                 print "Warning:  exception thrown while trying to register job"
                 exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -314,9 +359,9 @@ def main():
                 print "NOT unlinking", lfn, "so you can check why it failed."
             else:
                 print "Amp-split for", job_out["name"], "succeeded"
-                if not args.local:
-                    print "Unlinking", lfn
-                    os.unlink(lfn)
+                #if not args.local:
+                print "Unlinking", lfn
+                os.unlink(lfn)
             sys.stdout.flush()
 
         # RS 2013/09/16:  Man, do we really need to do all these cross checks?
@@ -433,6 +478,9 @@ def fetch_schedule_logs(date):
     """Fetch scheduler logs from remote system and return list of filenames"""
     # make local directory
     local_scheduler_log_path = CPP.raw + "/scheduler_logs"
+    #hack
+    #return 0, glob.glob("{0}/SM_LOGFILE.{1}*".format(
+    #        local_scheduler_log_path, date))
     doage("mkdir -p " + local_scheduler_log_path)
     # copy files on remote system over
     remote_scheduler_log_path = \
@@ -443,13 +491,14 @@ def fetch_schedule_logs(date):
     return status, glob.glob("{0}/SM_LOGFILE.{1}*".format(
                              local_scheduler_log_path, date))
 
-def ls_remote(acct, remotepath, imageid='53|89|805|053|089|169'):
+def ls_remote(acct, remotepath, obstype='MS_*|TFF_*|3PS_42|BAD_42',imageid='53|89|805|053|089|169'):
     """Determine which files need to be ingested.
 
         acct:  e.g., "skymap@markle", or None if image is local
         remotepath:  e.g., /export/markle2/images/2012-05-31
+        obstype: obstype_surveyId as decoded by decode-Ob_Id.pl
     """
-
+    ismarkle=False
     if acct: 
         # RS 2013/09/21:  Modified to make sure TAROS is done writing the file
         # to disk before attempting to download!  Incomplete files will not
@@ -457,27 +506,62 @@ def ls_remote(acct, remotepath, imageid='53|89|805|053|089|169'):
         # files without the requested keyword will print nothing, at least on
         # markle.  I wouldn't swear to this code being portable!
         if re.search("markle", acct):
-            cmd = "ssh {0} \"ls -tr {1}/*.fits | xargs gethead -au NCCDS\""\
-                  .format(acct, remotepath)
-        # RS 2014/06/26:  In fact it isn't portable.  If we're trying to get
-        # data off of raijin, gethead won't be available, but it won't matter
-        # because raijin will only have data that are completely written out.
-        # i.e., processing archived data is not real-time, by definition.
+            ismarkle=True
+            cmd = "ssh {0} \'ls -tr {1}/*.fits | xargs gethead -au NCCDS"\
+                .format(acct, remotepath)
+            # RS 2014/06/26:  In fact it isn't portable.  If we're trying to get
+            # data off of raijin, gethead won't be available, but it won't matter
+            # because raijin will only have data that are completely written out.
+            # i.e., processing archived data is not real-time, by definition.
         else:
-            cmd = "ssh {0} \"cd {1}; ls *.fits\"".format(acct, remotepath)
+            cmd = "ssh {0} \'cd {1}; ls *.fits".format(acct, remotepath)
+
+        cmd += " | awk '\\''{if ($2!=\"___\") print $1}'\\''"
+        if ismarkle and len(obstype)>0:
+            #add awk command to call decode-Ob_Id.pl                                                                                                                         
+            matchstrs=[]
+            for obstypeid in obstype.split('|'):
+                parts=obstypeid.split('_')
+                if parts[1]=='*':
+                    matchstrs.append("/Observation type:[ ]+"+parts[0]+"/")
+                else:
+                    matchstrs.append("/Observation type:[ ]+"+parts[0]+".*[ ]+Survey id:[ ]+"+parts[1]+"/")
+            awkstr=" || ".join(matchstrs)
+            cmd +=" | awk -F'\\''_'\\'' '\\''{print $0} {system(\"/home/skymap/Scheduler/Scheduler_4/utils/decode-Ob_Id.pl \"$2)}'\\''"
+            cmd +=" | xargs -L 6"
+            cmd +=" | awk '\\''"+awkstr+" {print $1}'\\''"
+            cmd +="\'"
+        else:
+            cmd +="\'"
     else:
         # RS 2014/06/26:  This is for data already downloaded locally.
         cmd = "ls -tr {0}/*.fits | xargs gethead -au NCCDS".format(remotepath)
-    cmd += " | awk '{if ($2!=\"___\") print $1}'"
+        cmd += " | awk '{if ($2!=\"___\") print $1}'"
+
+                    
     status, stdoutstr, stderrstr = doage(cmd)
-    # Return the individual filenames we found.
-    # The regex below should match:
-    filelist = [line for line in stdoutstr.strip().split("\n")
-                # FY - since June 2014, flat fiels changed from 11 to 53
-                # original SN science test data = 805, flat fields = 53,
-                # main survey data = 87, SN survey data = 89,
-                # test WCS set for Chris Wolf (2013/03/18) = 133
-                if re.search('Skymapper_('+imageid+').*T(\d{2})', line)]
+    if len(obstype)>0 and ismarkle:
+        filelist = [line for line in stdoutstr.strip().split("\n")
+                    if re.search('Skymapper_.*T(\d{2})', line)]
+    elif len(obstype)>0:
+        filelist=[]
+        obstypes=obstype.split('|')
+        obstypes1=[obst.split('_')[0] for obst in obstypes if obst.split('_')[1]=='*']
+        obstypes2=[obst for obst in obstypes if obst.split('_')[1]!='*']
+        for line in stdoutstr.strip().split("\n"):
+            if not re.search('Skymapper_.*T(\d{2})', line): continue
+            obscode=decode_obs_id(line.split('/')[-1].split('_')[1])
+            if (obscode[0]+'_%d'%obscode[1]) in obstypes2 or obscode[0] in obstypes1:
+                filelist.append(line)
+    else:
+        # Return the individual filenames we found.
+        # The regex below should match:
+        filelist = [line for line in stdoutstr.strip().split("\n")
+                    # FY - since June 2014, flat fiels changed from 11 to 53
+                    # original SN science test data = 805, flat fields = 53,
+                    # main survey data = 87, SN survey data = 89,
+                    # test WCS set for Chris Wolf (2013/03/18) = 133
+                    if re.search('Skymapper_('+imageid+').*T(\d{2})', line)]
 
     return status, filelist[::]
 
@@ -502,6 +586,7 @@ def scp_from_remote(acct, rfn, lfn):
     status = doage(cmd)[0]
     if status != 0:
         raise IngestFail("scp failed")
+    temp=os.system('chmod 644 %s'%lfn)
     return lfn
 
 
@@ -530,9 +615,14 @@ def correct_image_header(lfn, manifest):
     basename = os.path.basename(lfn)
     match = re.search("(\d+)_(\d+)_(\d+-\d+-\d+T\d+:\d+)", lfn)
     if match == None:
-        print "correct_headers:  can't extract obsseq from", basename
-        return
-    id = "{0}_{1}".format(match.group(1), match.group(3))
+        match = re.search("(\d+)_(\d+-\d+-\d+T\d+:\d+)", lfn)
+        if match == None:
+            print "correct_headers:  can't extract obsseq from", basename
+            return
+        else:
+            id = "{0}_{1}".format(match.group(1), match.group(2))
+    else:
+        id = "{0}_{1}".format(match.group(1), match.group(3))
     print "correct_headers:  Looking for id", id, "in manifest"
     if id not in manifest:
         print "WARNING:  {0} NOT found in manifest".format(id)
@@ -586,36 +676,40 @@ def run_fits64to32_cal(lfn, workdir="."):
         # If there are several, choose the most recently built flat.
         flatpath = CPP.flats + '/' + filtname
         files = glob.glob(flatpath + "/17/flat_*_17.fits")
-        if len(files) < 1:
-            print "No flat fields available for filter", filtname
-            print "Splitting without applying flatfield"
-            cmd = "{0} -align".format(cmd)
-        else:
-            files.sort()
-            files.reverse()
+        doflat=False
+        if len(files) >=1:
+            #find closest flat
+            flatoff=[]
             for file in files:
                 try:
                     mm=re.search("/\d+/flat.*_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})_.*17.fits",file)
-                    fobsseq=mm.group(1)
-                    if fobsseq < names.obsseq: break
+                    timeoffset=datetime.datetime.strptime(mm.group(1),'%Y-%m-%dT%H:%M:%S')-names.dateobs
+                    flatoff.append(abs(timeoffset.days+timeoffset.seconds/24./3600.))
                 except:
-                    pass
-
-            mm = re.search("/\d+/(flat.*)_17.fits", file)
-            flatbase = mm.group(1)
-            # If flats exist for all the CCDs, call fits64to32 with flat fields.
-            flatfnames = ["{0}/{1:02d}/{2}_{3:d}.fits".format(flatpath,ccd,flatbase,ccd) for ccd in range(1,33)]
-            # print "Checking flat", flatbase
-            flatsfound = [os.path.exists(fn) for fn in flatfnames]
-            if all(flatsfound):
-                cmd = "{0} -flatpath {1} -flatbase {2}".format(
-                    cmd, flatpath, flatbase)
-                # If one or more CCDs is/are missing flats for this field and filter,
-                # don't flatten the image, just overscan-subtract and align amps.
-            else:
-                print "Missing/incomplete flat field in", flatbase
-                print "Splitting without applying flatfield"
-                cmd = "{0} -align".format(cmd)
+                    flatoff.append(100)
+            if min(flatoff)<100:
+                minflat=flatoff.index(min(flatoff))
+                file=files[minflat]
+                            
+                mm = re.search("/\d+/(flat.*)_17.fits", file)
+                flatbase = mm.group(1)
+                # If flats exist for all the CCDs, call fits64to32 with flat fields.
+                flatfnames = ["{0}/{1:02d}/{2}_{3:d}.fits".format(flatpath,ccd,flatbase,ccd) for ccd in range(1,33)]
+                # print "Checking flat", flatbase
+                flatsfound = [os.path.exists(fn) for fn in flatfnames]
+                if all(flatsfound):
+                    doflat=True
+                else:
+                    print "Missing/incomplete flat field in", flatbase
+                    # If one or more CCDs is/are missing flats for this field and filter,
+                    # don't flatten the image, just overscan-subtract and align amps.
+        if doflat:
+            cmd = "{0} -flatpath {1} -flatbase {2}".format(
+                cmd, flatpath, flatbase)
+        else:
+            print "No proper flat fields available for filter", filtname
+            print "Splitting without applying flatfield"
+            cmd = "{0} -align".format(cmd)
 
         # Find the bad pixel mask, if it exists.
         # If there are several, choose the most recently built.
@@ -746,7 +840,12 @@ def add_fieldccd_to_header(lfn):
                         "Unique SkyMapper field ID used by scheduler")
             head.update('SUBFIELD', subfield,
                         "Subfield (SkyMapper CCD for ROTSKYPA=0)")
-
+            # FY: add skymapper observation type
+            try:
+                head.update('PROGRAM',decode_obs_id(bfn.split('_')[1])[0],
+                            "SkyMapper observation program type")
+            except:
+                pass
         # RS 2012/07/12:  As a final step, for 'object' files rename so that
         # the extension is the subfield, not the physical CCD number.
         if imagetype == 'object' and ext != subfield:

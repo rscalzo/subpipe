@@ -80,7 +80,8 @@ STATICFILES_DIRS = (
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
-    CPP.data + '/mydjango/static/',
+    CPP.home + "/mydjango/staticfiles",
+    CPP.data + '/mydjango/static',
 )
 
 # List of finder classes that know how to find static files in
@@ -137,6 +138,11 @@ INSTALLED_APPS = (
     "mydjango.jobstats",
     "mydjango.followup",
 )
+try:
+    import south
+    INSTALLED_APPS=INSTALLED_APPS+("south",)
+except:
+    pass
 
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
@@ -174,6 +180,7 @@ TEMPLATE_CONTEXT_PROCESSORS = (
 
 
 WSGI_APPLICATION = "mydjango.wsgi.application"
+
 
 try:
     if is_production_install:

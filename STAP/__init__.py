@@ -14,5 +14,5 @@ from .STAP_maskcombine import maskcombine
 from .STAP_makethumbs import makethumbs
 # from .STAP_getDSS import getDSS
 # from .STAP_getmag import getmag
-__all__ = ["WCS", "remap", "SEx", "hotpants", "flag", "xref", "roundint",
+__all__ = ["WCS", "remap", "SEx", "hotpants", "classify", "xref", "roundint",
            "flatcombine", "zeropoint", "unzip", "maskcombine","makethumbs"]

@@ -33,7 +33,11 @@ def remap(newname, refname, outname,
             if "WAT1_001" not in refhdr and "A_ORDER" not in refhdr:
                 raise STAP_Error(msg="No WCS information in header")
     except:
-        raise STAP_Error(msg="Error reading file %s"%refname)
+        if 'coadd' in refname or 'combined' in refname:
+            #coadded image using swarp would have different WCS
+            pass
+        else:
+            raise STAP_Error(msg="Error reading file %s"%refname)
     # If the raw REF is gzip-compressed, ungzip it
     refbase, refext = os.path.splitext(refname)
     if refext == ".gz":
@@ -54,7 +58,12 @@ def remap(newname, refname, outname,
     elif module == "swarp":
         # RS 2011/10/28:  This part is a bit fiddly -- we have to copy the NEW's
         # FITS header to a separate file before we can remap.  Use pyfits.
+        # FY - really only want the WCS solution of new
+        # important to preserve the SATURATE, GAIN, EXPTIME, RDNOISE
+        refhdr=pyfits.getheader(refname)
         with pyfits.open(newname) as newptr:
+            for key in ['EXPTIME','SATURATE','GAIN','RDNOISE','SEEING']:
+                newptr[0].header.update(key,refhdr[key])
             with open(outname.replace(".fits",".head"),"w") as newrefhdr:
                 newrefhdr.write(str(newptr[0].header.ascardlist()))
         # Here's the actual swarp command we're going to use.

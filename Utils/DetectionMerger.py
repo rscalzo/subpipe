@@ -21,7 +21,7 @@ from .Catalog import CatalogEntry, SExtractorDetection, \
 from .RealBogus import RealBogus
 from .TrackableException import TrackableException
 from .Photometry import calc_fluxlim_img, sexzpidx
-from .Constants import get_obsseq, FilenamesXsient, Filenames, SMfield_lookup
+from .Constants import get_obsid, get_obsseq, FilenamesXsient, Filenames, SMfield_lookup
 
 
 # What do I want this code to be able to do?
@@ -54,6 +54,7 @@ class SkymapperDetection(FITSRecord, KeywordRecord, CatalogEntry):
         [ "runtag",  "RUNTAG",      "15A", "",     "A15",    ""   ],
         [ "filter",  "FILTER",       "5A", "",      "A5",    ""   ],
         [ "field",   "SM_FIELD",     "1I", "",      "I4",    ""   ],
+        [ "obsid",   "OBSID",        "10A", "",     "A10",    ""   ],
         [ "obsseq",  "OBSSEQ",      "19A", "",     "A19",    ""   ],
         [ "subfield", "SUBFIELD",    "1I", "",      "I2",    ""   ],
         [ "ccd",     "SM_CCD",       "1I", "",      "I2",    ""   ],
@@ -123,7 +124,7 @@ class SkymapperDetection(FITSRecord, KeywordRecord, CatalogEntry):
 class SkymapperTransient(CatalogEntry, KeywordRecord):
     """A small wrapper class to help with cross-IDs."""
 
-    _keyword_fields = [ [ "id",        0 ], [ "name",     "" ],
+    _keyword_fields = [ [ "id",        0 ], [ "name",     "" ],[ "type",     "" ],
                         [ "ra",      0.0 ], [ "dec",     0.0 ],
                         [ "field",     0 ], [ "subfield",  0 ],
                         [ "nlcpts",    0 ], [ "last-jd", 0.0 ], ]
@@ -168,7 +169,13 @@ class DetectionMerger(object):
                     field = self.predetections[0].field
                     subfield = self.predetections[0].subfield
                     id = int(namematch.group(1))
-                    self.name_registry[id] = { "name": value, 'id': id }
+                    # FY - inherit object type, which will help down the road
+                    # e.g. not making thumbnails for roids and junks
+                    try:
+                        objtype= self.header['TYPE%04d'%id]
+                    except:
+                        objtype= ''
+                    self.name_registry[id] = { "name": value, 'id': id ,"type":objtype}
         else:
             self.predetections = [ ]
             self.upperlimits = [ ]
@@ -176,6 +183,11 @@ class DetectionMerger(object):
             self.header = None
 
     def write_fits_file(self, predetect_file):
+        #update name registry with object types
+        for kw in self.name_registry.values():
+            typekw = "TYPE{0:04d}".format(kw['id'])
+            self.header.update(typekw, kw["type"],
+                               "Type of source with index {0}".format(id))
         SkymapperDetection.write_fits_file(predetect_file,
                 self.predetections + self.upperlimits, header=self.header)
 
@@ -223,6 +235,7 @@ class DetectionMerger(object):
         # bug by filling this up front, instead of in an if/then below where
         # it may be missed.
         obsseq = get_obsseq(candsfname)
+        obsid  = get_obsid(candsfname)
 
         # Extract some key information from the FITS header.  Not all of
         # these quantities are currently being filled, so we'll need to start
@@ -255,7 +268,7 @@ class DetectionMerger(object):
             date = re.findall('\d+', newheader["DATE-OBS"])
             jd = ephem.Date(tuple([int(i) for i in date])) + 2415020
             converted_detections = \
-                [SkymapperDetection(nd, subfield=subfield, obsseq=obsseq,
+                [SkymapperDetection(nd, subfield=subfield, obsid=obsid, obsseq=obsseq,
                                 jd=jd, field=field, filter=filter, ccd=ccd,
                                 zp=zp, zperr=zperr, exptime=exptime,
                                 runtag=runtag) for nd in newdetections]
@@ -272,7 +285,7 @@ class DetectionMerger(object):
         # Present the upper limit as a SkymapperDetection itself.
         flux_ulim = calc_fluxlim_img(bkgsig, aperture=6.0, CL=0.95)
         mag_lim = -2.5*np.log10(flux_ulim) + zp
-        ulimit = SkymapperDetection(id=-1, runtag=runtag, filter=filter,obsseq=obsseq,
+        ulimit = SkymapperDetection(id=-1, runtag=runtag, filter=filter,obsid=obsid, obsseq=obsseq,
                     field=field, subfield=subfield, ccd=ccd, x=0.0, y=0.0,
                     jd=jd, ra=0.0, dec=0.0, exptime=exptime,
                     flux=flux_ulim, fluxerr=-0.95, flag=0, rbscore=0.0,
@@ -453,6 +466,8 @@ class DetectionMerger(object):
             lcheader = pyfits.PrimaryHDU().header
             lcheader.update("CANDNAME", src.name,
                             "Unique name of candidate")
+            lcheader.update("TYPE", src.type,
+                            "Type of candidate")
             lcheader.update("FIELD_ID", src.field,
                             "SkyMapper main survey ID for this (RA,DEC)")
             lcheader.update("SUBFIELD", src.subfield,
@@ -489,7 +504,7 @@ class DetectionMerger(object):
                     name = self.name_registry[id]["name"]
                 else:
                     name = self.candidate_name(ra, dec)
-                    self.name_registry[id] = { "name": name, "autotype": "?" }
+                    self.name_registry[id] = { "name": name, "autotype": "?", "type":"?" }
                     if self.verbose:
                         print "Adding new transient", name, "with id", id
 
@@ -506,7 +521,9 @@ class DetectionMerger(object):
                 namekw = "NAME{0:04d}".format(int(id))
                 self.header.update(namekw, name,
                                    "Name of source with index {0}".format(id))
-
+                typekw = "TYPE{0:04d}".format(int(id))
+                self.header.update(typekw, self.name_registry[id]["type"],
+                                   "Type of source with index {0}".format(id))
                 # Create a light curve file for the thing, and store it in a
                 # directory the name of which we can construct on demand.
                 # In practice, when updating light curve information we will
@@ -515,6 +532,8 @@ class DetectionMerger(object):
                 lcheader = pyfits.PrimaryHDU().header
                 lcheader.update("CANDNAME", name,
                                 "Unique name of candidate")
+                lcheader.update("TYPE", self.name_registry[id]["type"],
+                                "Type of candidate")
                 lcheader.update("FIELD_ID", field,
                                 "SkyMapper main survey ID for this (RA,DEC)")
                 lcheader.update("SUBFIELD", subfield,
@@ -559,6 +578,7 @@ class DetectionMerger(object):
                         print comment
                         self.name_registry[sources[i].id].update(
                             { "autotype": tag,
+                              "type": tag,
                               "match": objects[matchidx[i]],
                               "comment":  comment })
             print "VetBot:  matched {0}/{1} {2} with {3} candidates"\
@@ -590,15 +610,28 @@ class DetectionMerger(object):
 
         # Get ready to match stars to the catalog
         ralist, declist = [s.ra for s in sources], [s.dec for s in sources]
-        ra_min, dec_min = np.min(ralist), np.min(declist)
-        ra_max, dec_max = np.max(ralist), np.max(declist)
-        ra_mid, dec_mid = (ra_max + ra_min)/2, (dec_max + dec_min)/2
-        cD = np.cos(np.pi*0.5*(dec_max - dec_min)/180.0)
-        R = 1.5*np.max([cD*(ra_max - ra_min)/2, (dec_max - dec_min)/2])
+        # FY - ra wraps around 360 degrees, so dec first
+        dec_min,dec_max = np.min(declist), np.max(declist)
+        dec_mid = (dec_max + dec_min)/2
+        # be generous, use lower absolute dec boundary, upper cD
+        cD = np.cos(np.pi*min(map(abs,[dec_min,dec_max]))/180.0)
+        # now ra
+        ra_min, ra_max = np.min(ralist), np.max(ralist)
+        if ra_max - ra_min>180.: #unless the field is close to -90
+            ralist.sort()
+            ragap=[ralist[ira+1]-ra for ira,ra in enumerate(ralist[:-1])]
+            ra_max=np.max(ralist[:np.argmax(ragap)+1])+360.
+            ra_min=np.min(ralist[np.argmax(ragap)+1:])
+            ra_mid = (ra_max + ra_min)/2
+            if ra_mid>360: ra_mid-=360.
+        else:
+            ra_mid = (ra_max + ra_min)/2
+        R = np.max([cD*(ra_max - ra_min)/2, (dec_max - dec_min)/2])
         # RS 2014/02/01:  I used to think the above code was clever until it
         # started querying 1500 deg^2 areas in the APASS catalog.  If that
         # threatens to happen, just use the field RA and DEC; it's inefficient
         # but not horribly so.
+        # FY - above code has been fixed hopefully....
         if R > 3.5:
             ra_mid, dec_mid, R = chcke_field.ra, chcke_field.dec, 3.5
             print "WARNING:  something's fishy about this field"
@@ -660,7 +693,21 @@ class DetectionMerger(object):
                 #match_objtype(sources,sdss_xsc,5.0,"Galaxy","SDSS DR9","Cand",update=False)
                 #match_objtype(sources,sdss_psc,1.0,"PointSource","SDSS DR9","Star",update=False)
 
- 
+
+        #FY: hack for Kepler K6
+        kegfile='/priv/maipenrai/skymap/skymap/subpipe/etc/KEGSC6_mod.txt'
+        if os.path.exists(kegfile):
+            keglist=np.genfromtxt(kegfile,usecols=[0,1,2],dtype=[('name','S10'),('ra','f'),('dec','f')])
+            keg = []
+            for kobj in keglist:
+                kegobj=lambda: None
+                kegobj.ra=kobj['ra']
+                kegobj.dec=kobj['dec']
+                kegobj.name=kobj['name']
+                keg.append(kegobj)
+                
+            match_objtype(sources,keg,20.0,"GALAXY","KEGSC6","KEG")
+
     def compile_roidxchcke(self, candsfnamelist):
         """Cross-checks RealBogus completeness/efficiency against asteroids
 
